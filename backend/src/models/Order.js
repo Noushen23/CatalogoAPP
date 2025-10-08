@@ -1,0 +1,435 @@
+const { query, getConnection } = require('../config/database');
+const { v4: uuidv4 } = require('uuid');
+
+class Order {
+  constructor(data) {
+    this.id = data.id;
+    this.numeroOrden = data.numero_orden;
+    this.usuarioId = data.usuario_id;
+    this.direccionEnvioId = data.direccion_envio_id;
+    this.estado = data.estado;
+    this.subtotal = parseFloat(data.subtotal || 0);
+    this.descuento = parseFloat(data.descuento || 0);
+    this.costoEnvio = parseFloat(data.costo_envio || 0);
+    this.impuestos = parseFloat(data.impuestos || 0);
+    this.total = parseFloat(data.total || 0);
+    this.metodoPago = data.metodo_pago;
+    this.referenciaPago = data.referencia_pago;
+    this.notas = data.notas;
+    this.fechaCreacion = data.fecha_creacion;
+    this.fechaActualizacion = data.fecha_actualizacion;
+    this.fechaEntregaEstimada = data.fecha_entrega_estimada;
+    this.fechaEntregaReal = data.fecha_entrega_real;
+    
+    // Datos relacionados
+    this.usuario = data.usuario || null;
+    this.direccionEnvio = data.direccion_envio || null;
+    this.items = data.items || [];
+  }
+
+  // Crear pedido desde carrito
+  static async createFromCart(cartData) {
+    console.log('🚀 Iniciando createFromCart con datos:', {
+      usuarioId: cartData.usuarioId,
+      direccionEnvioId: cartData.direccionEnvioId,
+      metodoPago: cartData.metodoPago,
+      itemsCount: cartData.items?.length || 0
+    });
+
+    const {
+      usuarioId,
+      direccionEnvioId,
+      metodoPago = 'efectivo',
+      referenciaPago = null,
+      notas = null,
+      items = []
+    } = cartData;
+
+    const connection = await getConnection();
+    console.log('✅ Conexión a base de datos obtenida');
+    
+    try {
+      await connection.beginTransaction();
+
+      // 1. VALIDAR CARRITO Y PRODUCTOS
+      if (!items || items.length === 0) {
+        throw new Error('El carrito está vacío');
+      }
+
+      console.log('🔍 Validando productos del carrito...');
+      // Validar cada producto en el carrito
+      for (const item of items) {
+        console.log('🔍 Validando producto:', item.productId);
+        const productSql = `
+          SELECT id, nombre, stock, activo, precio, precio_oferta
+          FROM productos 
+          WHERE id = ? AND activo = true
+        `;
+        
+        const [products] = await connection.execute(productSql, [item.productId]);
+        
+        if (products.length === 0) {
+          throw new Error(`Producto "${item.productoNombre || item.productId}" no encontrado o no disponible`);
+        }
+
+        const product = products[0];
+        
+        // Verificar stock suficiente
+        if (product.stock < item.cantidad) {
+          throw new Error(`Stock insuficiente para "${product.nombre}". Disponible: ${product.stock}, solicitado: ${item.cantidad}`);
+        }
+
+        // Verificar que el precio unitario coincida
+        const precioFinal = product.precio_oferta && product.precio_oferta < product.precio 
+          ? product.precio_oferta 
+          : product.precio;
+        
+        if (Math.abs(precioFinal - item.precioUnitario) > 0.01) {
+          throw new Error(`El precio del producto "${product.nombre}" ha cambiado. Actualiza tu carrito.`);
+        }
+      }
+
+      // 2. GENERAR NÚMERO DE ORDEN ÚNICO
+      const numeroOrden = await this.generateOrderNumber();
+      
+      // 3. CALCULAR TOTALES
+      const subtotal = items.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+      const costoEnvio = 5000; // Costo fijo de envío
+      const impuestos = 0; // Por ahora sin impuestos
+      const descuento = 0; // Por ahora sin descuentos
+      const total = subtotal - descuento + costoEnvio + impuestos;
+
+      const id = uuidv4();
+
+      // 4. CREAR LA ORDEN
+      const orderSql = `
+        INSERT INTO ordenes (
+          id, numero_orden, usuario_id, direccion_envio_id, estado,
+          subtotal, descuento, costo_envio, impuestos, total,
+          metodo_pago, referencia_pago, notas, fecha_creacion, fecha_actualizacion
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `;
+
+      await connection.execute(orderSql, [
+        id,
+        numeroOrden,
+        usuarioId,
+        direccionEnvioId || null,
+        'pendiente',
+        subtotal,
+        descuento,
+        costoEnvio,
+        impuestos,
+        total,
+        metodoPago,
+        referenciaPago,
+        notas
+      ]);
+
+      // 5. CREAR ITEMS DE LA ORDEN Y ACTUALIZAR STOCK
+      for (const item of items) {
+        const itemId = uuidv4();
+        
+        // Crear item de la orden
+        const itemSql = `
+          INSERT INTO items_orden (
+            id, orden_id, producto_id, cantidad, precio_unitario, subtotal,
+            fecha_creacion
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW())
+        `;
+        
+        await connection.execute(itemSql, [
+          itemId,
+          id,
+          item.productId,
+          item.cantidad,
+          item.precioUnitario,
+          item.subtotal
+        ]);
+
+        // ACTUALIZAR STOCK DEL PRODUCTO
+        const updateStockSql = `
+          UPDATE productos 
+          SET stock = stock - ?, fecha_actualizacion = NOW()
+          WHERE id = ?
+        `;
+        
+        await connection.execute(updateStockSql, [item.cantidad, item.productId]);
+      }
+
+      // 6. DESACTIVAR/LIMPIAR CARRITO
+      const clearCartSql = 'DELETE FROM items_carrito WHERE carrito_id = ?';
+      await connection.execute(clearCartSql, [cartData.cartId]);
+
+      const deactivateCartSql = 'UPDATE carritos SET activo = false, fecha_actualizacion = NOW() WHERE id = ?';
+      await connection.execute(deactivateCartSql, [cartData.cartId]);
+
+      await connection.commit();
+      console.log('✅ Transacción completada exitosamente');
+      
+      // Retornar la orden completa
+      console.log('🔍 Buscando orden creada con ID:', id);
+      const createdOrder = await this.findById(id);
+      
+      if (!createdOrder) {
+        throw new Error('Error: No se pudo encontrar la orden recién creada');
+      }
+      
+      console.log('✅ Orden encontrada y retornada');
+      return createdOrder;
+      
+    } catch (error) {
+      console.error('Error en createFromCart:', error);
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // Generar número de orden único
+  static async generateOrderNumber() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    
+    // Contar órdenes del día
+    const countSql = `
+      SELECT COUNT(*) as count 
+      FROM ordenes 
+      WHERE DATE(fecha_creacion) = CURDATE()
+    `;
+    
+    const result = await query(countSql);
+    const count = result[0].count + 1;
+    
+    return `ORD-${year}${month}${day}-${String(count).padStart(3, '0')}`;
+  }
+
+  // Buscar pedido por ID
+  static async findById(id) {
+    const sql = `
+      SELECT o.*, 
+             u.email as usuario_email, u.nombre_completo as usuario_nombre,
+             de.nombre_destinatario, de.telefono, de.direccion, de.ciudad, de.departamento
+      FROM ordenes o
+      LEFT JOIN usuarios u ON o.usuario_id = u.id
+      LEFT JOIN direcciones_envio de ON o.direccion_envio_id = de.id
+      WHERE o.id = ?
+    `;
+    
+    const orders = await query(sql, [id]);
+    if (orders.length === 0) return null;
+
+    const orderData = orders[0];
+    const items = await this.getOrderItems(id);
+
+    return new Order({
+      ...orderData,
+      usuario: {
+        email: orderData.usuario_email,
+        nombreCompleto: orderData.usuario_nombre
+      },
+      direccionEnvio: orderData.nombre_destinatario ? {
+        nombreDestinatario: orderData.nombre_destinatario,
+        telefono: orderData.telefono,
+        direccion: orderData.direccion,
+        ciudad: orderData.ciudad,
+        departamento: orderData.departamento
+      } : null,
+      items
+    });
+  }
+
+  // Buscar pedidos por usuario
+  static async findByUserId(userId, options = {}) {
+    const { limit = 20, offset = 0, estado = null } = options;
+    
+    let sql = `
+      SELECT o.*, 
+             u.email as usuario_email, u.nombre_completo as usuario_nombre,
+             de.nombre_destinatario, de.telefono, de.direccion, de.ciudad, de.departamento
+      FROM ordenes o
+      LEFT JOIN usuarios u ON o.usuario_id = u.id
+      LEFT JOIN direcciones_envio de ON o.direccion_envio_id = de.id
+      WHERE o.usuario_id = ?
+    `;
+    
+    const params = [userId];
+    
+    if (estado) {
+      sql += ' AND o.estado = ?';
+      params.push(estado);
+    }
+    
+    sql += ' ORDER BY o.fecha_creacion DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    
+    const orders = await query(sql, params);
+    
+    const ordersWithItems = await Promise.all(orders.map(async (orderData) => {
+      const items = await this.getOrderItems(orderData.id);
+      return new Order({
+        ...orderData,
+        usuario: {
+          email: orderData.usuario_email,
+          nombreCompleto: orderData.usuario_nombre
+        },
+        direccionEnvio: orderData.nombre_destinatario ? {
+          nombreDestinatario: orderData.nombre_destinatario,
+          telefono: orderData.telefono,
+          direccion: orderData.direccion,
+          ciudad: orderData.ciudad,
+          departamento: orderData.departamento
+        } : null,
+        items
+      });
+    }));
+    
+    return ordersWithItems;
+  }
+
+  // Obtener items de una orden
+  static async getOrderItems(orderId) {
+    const sql = `
+      SELECT io.*, 
+             p.nombre as producto_nombre, p.descripcion as producto_descripcion,
+             (SELECT url_imagen FROM imagenes_producto WHERE producto_id = p.id ORDER BY orden ASC LIMIT 1) as imagen_url
+      FROM items_orden io
+      JOIN productos p ON io.producto_id = p.id
+      WHERE io.orden_id = ?
+      ORDER BY io.fecha_creacion ASC
+    `;
+    
+    const items = await query(sql, [orderId]);
+    return items.map(item => ({
+      id: item.id,
+      productId: item.producto_id,
+      productName: item.producto_nombre,
+      productDescription: item.producto_descripcion,
+      cantidad: item.cantidad, // Cambiar quantity por cantidad para consistencia
+      precioUnitario: parseFloat(item.precio_unitario), // Cambiar unitPrice por precioUnitario
+      subtotal: parseFloat(item.subtotal),
+      imageUrl: item.imagen_url
+    }));
+  }
+
+  // Actualizar estado del pedido
+  async updateStatus(newStatus) {
+    const validStatuses = ['pendiente', 'confirmada', 'en_proceso', 'enviada', 'entregada', 'cancelada', 'reembolsada'];
+    
+    if (!validStatuses.includes(newStatus)) {
+      throw new Error('Estado de pedido inválido');
+    }
+
+    const sql = `
+      UPDATE ordenes 
+      SET estado = ?, fecha_actualizacion = NOW()
+      WHERE id = ?
+    `;
+    
+    await query(sql, [newStatus, this.id]);
+    this.estado = newStatus;
+    this.fechaActualizacion = new Date();
+    
+    return this;
+  }
+
+  // Cancelar pedido
+  async cancel(reason = null) {
+    if (this.estado === 'entregada') {
+      throw new Error('No se puede cancelar un pedido ya entregado');
+    }
+    
+    if (this.estado === 'cancelada') {
+      throw new Error('El pedido ya está cancelado');
+    }
+
+    const sql = `
+      UPDATE ordenes 
+      SET estado = 'cancelada', notas = ?, fecha_actualizacion = NOW()
+      WHERE id = ?
+    `;
+    
+    const newNotes = reason ? 
+      (this.notas ? `${this.notas}\n\nCancelado: ${reason}` : `Cancelado: ${reason}`) : 
+      this.notas;
+    
+    await query(sql, [newNotes, this.id]);
+    this.estado = 'cancelada';
+    this.notas = newNotes;
+    this.fechaActualizacion = new Date();
+    
+    return this;
+  }
+
+  // Obtener estadísticas de pedidos
+  static async getStats(userId = null) {
+    let sql = `
+      SELECT 
+        COUNT(*) as total_orders,
+        SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pending_orders,
+        SUM(CASE WHEN estado = 'confirmada' THEN 1 ELSE 0 END) as confirmed_orders,
+        SUM(CASE WHEN estado = 'enviada' THEN 1 ELSE 0 END) as shipped_orders,
+        SUM(CASE WHEN estado = 'entregada' THEN 1 ELSE 0 END) as delivered_orders,
+        SUM(CASE WHEN estado = 'cancelada' THEN 1 ELSE 0 END) as cancelled_orders,
+        SUM(CASE WHEN estado = 'entregada' THEN total ELSE 0 END) as total_spent,
+        AVG(CASE WHEN estado = 'entregada' THEN total ELSE NULL END) as average_order_value
+      FROM ordenes
+    `;
+    
+    const params = [];
+    if (userId) {
+      sql += ' WHERE usuario_id = ?';
+      params.push(userId);
+    }
+    
+    const result = await query(sql, params);
+    return result[0];
+  }
+
+  // Convertir a objeto público
+  toPublicObject() {
+    return {
+      id: this.id,
+      numeroOrden: this.numeroOrden,
+      usuarioId: this.usuarioId,
+      direccionEnvioId: this.direccionEnvioId,
+      estado: this.estado,
+      subtotal: this.subtotal,
+      descuento: this.descuento,
+      costoEnvio: this.costoEnvio,
+      impuestos: this.impuestos,
+      total: this.total,
+      metodoPago: this.metodoPago,
+      referenciaPago: this.referenciaPago,
+      notas: this.notas,
+      fechaCreacion: this.fechaCreacion,
+      fechaActualizacion: this.fechaActualizacion,
+      fechaEntregaEstimada: this.fechaEntregaEstimada,
+      fechaEntregaReal: this.fechaEntregaReal,
+      usuario: this.usuario,
+      direccionEnvio: this.direccionEnvio,
+      items: this.items
+    };
+  }
+
+  // Convertir a objeto público simplificado (para listas)
+  toPublicObjectSimple() {
+    return {
+      id: this.id,
+      numeroOrden: this.numeroOrden,
+      usuarioId: this.usuarioId,
+      estado: this.estado,
+      total: this.total,
+      fechaCreacion: this.fechaCreacion,
+      fechaActualizacion: this.fechaActualizacion,
+      itemsCount: this.items.length,
+      metodoPago: this.metodoPago,
+      usuario: this.usuario // Incluir información del usuario
+    };
+  }
+}
+
+module.exports = Order;

@@ -1,0 +1,238 @@
+import React, { useState } from 'react';
+import { View, Image, FlatList, TouchableOpacity, Dimensions, Modal, StyleSheet, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+interface ProductImage {
+  id: string;
+  url?: string;
+  urlImagen?: string;
+  orden?: number;
+  es_principal?: boolean;
+}
+
+interface Props {
+  images: string[] | ProductImage[];
+  style?: any;
+}
+
+const { width: screenWidth } = Dimensions.get('window');
+
+const ProductImages = ({ images, style }: Props) => {
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [modalVisible, setModalVisible] = useState(false);
+
+
+  if (!images || images.length === 0) {
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.noImageContainer}>
+          <Ionicons name="image-outline" size={80} color="#ccc" />
+          <Text style={styles.noImageText}>Sin imágenes disponibles</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Transformar y filtrar imágenes válidas
+  const validImages = images
+    .map((img) => {
+      if (typeof img === 'string') {
+        return img.trim() !== '' ? img : null;
+      } else if (img && typeof img === 'object') {
+        const url = img.url || img.urlImagen || img.url_imagen;
+        return url && url.trim() !== '' ? url : null;
+      }
+      return null;
+    })
+    .filter((img): img is string => img !== null && img !== '');
+  
+  if (validImages.length === 0) {
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.noImageContainer}>
+          <Ionicons name="image-outline" size={80} color="#ccc" />
+          <Text style={styles.noImageText}>Imágenes no válidas</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const openImageModal = (index: number) => {
+    setSelectedImageIndex(index);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+  };
+
+  const renderImage = ({ item, index }: { item: string; index: number }) => (
+    <TouchableOpacity
+      onPress={() => openImageModal(index)}
+      style={styles.imageItem}
+    >
+      <Image
+        source={{ uri: item }}
+        style={styles.image}
+        resizeMode="cover"
+        onError={(error) => {
+          console.log('❌ Error loading image:', item, error);
+        }}
+        onLoad={() => {
+          console.log('✅ Image loaded successfully:', item);
+        }}
+      />
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={[styles.container, style]}>
+      <FlatList
+        data={validImages}
+        keyExtractor={(item, index) => `${item}-${index}`}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        renderItem={renderImage}
+        contentContainerStyle={styles.imagesList}
+      />
+      
+      {/* Indicador de imágenes */}
+      {validImages.length > 1 && (
+        <View style={styles.dotsContainer}>
+          {validImages.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                index === selectedImageIndex && styles.activeDot
+              ]}
+            />
+          ))}
+        </View>
+      )}
+
+      {/* Modal para vista ampliada */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalContainer}>
+          <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
+          
+          <FlatList
+            data={validImages}
+            keyExtractor={(item, index) => `modal-${item}-${index}`}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={selectedImageIndex}
+            getItemLayout={(_, index) => ({
+              length: screenWidth,
+              offset: screenWidth * index,
+              index,
+            })}
+            renderItem={({ item }) => (
+              <View style={styles.modalImageContainer}>
+                <Image
+                  source={{ uri: item }}
+                  style={styles.modalImage}
+                  resizeMode="contain"
+                  onError={(error) => {
+                    console.log('❌ Error loading modal image:', item, error);
+                  }}
+                />
+              </View>
+            )}
+          />
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  noImageContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+  },
+  noImageText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  imagesList: {
+    paddingHorizontal: 10,
+
+  },
+  imageItem: {
+    marginRight: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    marginBottom: 10,
+    marginTop: 10,
+    marginLeft: 10,
+  },
+  image: {
+    width: 260,
+    height: 280,
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ccc',
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: '#007AFF',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 10,
+  },
+  modalImageContainer: {
+    width: screenWidth,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalImage: {
+    width: screenWidth,
+    height: '80%',
+  },
+});
+
+export default ProductImages;
