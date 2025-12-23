@@ -1,5 +1,12 @@
 require('dotenv').config();
 
+// Log de variables de entorno relacionadas con URLs (solo al cargar el módulo)
+console.log('🔍 [Config] Variables de entorno detectadas:', {
+  API_BASE_URL: process.env.API_BASE_URL || 'NO CONFIGURADA',
+  APP_URL: process.env.APP_URL || 'NO CONFIGURADA',
+  NODE_ENV: process.env.NODE_ENV || 'NO CONFIGURADA'
+});
+
 const config = {
   // Configuración del servidor
   port: process.env.PORT || 3001,
@@ -9,9 +16,9 @@ const config = {
   database: {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
-    name: process.env.DB_NAME || 'tiendamovil',
-    user: process.env.DB_USER || 'desarrollador',
-    password: process.env.DB_PASSWORD || 'Bomberos2025#',
+    name: process.env.DB_NAME || 'TiendaMovil',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
   },
   
   // Configuración JWT
@@ -24,23 +31,25 @@ const config = {
   // Configuración CORS
   cors: {
     origin: function (origin, callback) {
-      // Permitir requests sin origin (ej: mobile apps, Postman)
-      if (!origin) return callback(null, true);
+      // IMPORTANTE: Las apps móviles (React Native/Expo) NO envían origin header
+      // Por lo tanto, siempre permitir requests sin origin
+      if (!origin) {
+        return callback(null, true);
+      }
       
       const allowedOrigins = [
         'http://localhost:3000', 
-	'http://localhost:8081', // EXPO WEB
-	'http://localhost:8082', // EXPO web  alternativo 
-        'http://192.168.1.106:8082',
+        'http://localhost:8081', // Expo web
+        'http://localhost:8082', // Expo web alternativo
         'http://192.168.3.104:3000', // Admin web específico
         'http://192.168.3.104:3001', // Android emulator
         'http://192.168.1.106:3000', // Admin web IP pública
         'http://192.168.1.106:3001', // API IP pública
-	'https://181.49.225.64:3000', // EXPOS
-	'https://181.49.225.64:3001',
+        'http://181.49.225.64:3000', // Admin web servidor remoto
+        'http://181.49.225.64:3001', // API servidor remoto
       ];
       
-      // Patrones para IPs locales y públicas
+      // Patrones para IPs locales, públicas y servidor remoto
       const patterns = [
         /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // Cualquier IP local 192.168.x.x con cualquier puerto
         /^http:\/\/181\.49\.225\.\d+:\d+$/, // IP del servidor remoto con cualquier puerto
@@ -66,8 +75,9 @@ const config = {
         return callback(null, true);
       }
       
-      // En producción, rechazar origins no permitidos
-	console.warn(' CORS: Origin no permitido:', origin);
+      // En producción, por seguridad, solo permitir origins conocidos
+      // PERO las apps móviles no tienen origin, así que ya fueron permitidas arriba
+      console.warn('⚠️ CORS: Origin no permitido:', origin);
       callback(new Error('No permitido por CORS'));
     },
     credentials: true,
@@ -81,7 +91,7 @@ const config = {
   app: {
     name: process.env.APP_NAME || 'Tienda Móvil',
     version: process.env.APP_VERSION || '1.0.0',
-    url: process.env.APP_URL || process.env.API_BASE_URL || 'http://192.168.1.106:3001'
+    url: process.env.APP_URL || process.env.API_BASE_URL || 'http://181.49.225.64:3001'
   },
   
   // Configuración de email (opcional)
@@ -101,8 +111,25 @@ const config = {
     path: process.env.UPLOADS_PATH || './uploads'
   },
 
-  // URL base para construir URLs de imágenes
-  apiBaseUrl: process.env.API_BASE_URL || process.env.APP_URL || 'http://192.168.1.106:3001',
+  // URL base para construir URLs de imágenes (SIEMPRE usar IP pública)
+  // FORZAR IP pública para que las imágenes sean accesibles desde cualquier lugar
+  apiBaseUrl: (() => {
+    // IP pública del servidor (siempre usar esta para imágenes)
+    const IP_PUBLICA = '181.49.225.64';
+    const PUERTO = process.env.PORT || 3001;
+    const apiBaseUrl = `http://${IP_PUBLICA}:${PUERTO}`;
+    
+    console.log('🔧 [Config] Configurando apiBaseUrl (FORZADO a IP pública):', {
+      API_BASE_URL_ENV: process.env.API_BASE_URL || 'NO CONFIGURADA',
+      APP_URL_ENV: process.env.APP_URL || 'NO CONFIGURADA',
+      IP_PUBLICA_FORZADA: IP_PUBLICA,
+      PUERTO: PUERTO,
+      valorFinal: apiBaseUrl,
+      nota: 'Las imágenes siempre usarán la IP pública para ser accesibles desde cualquier red'
+    });
+    
+    return apiBaseUrl;
+  })(),
   
   // Configuración de rate limiting
   rateLimit: {

@@ -367,7 +367,21 @@ export default function ProductDetailScreen() {
             isServiceView && { backgroundColor: serviceBackgroundCard }
           ]}>
             <ProductImages 
-              images={product.images || product.imagenes || []} 
+              images={(() => {
+                const imagesToUse = product.images || product.imagenes || [];
+                console.log('🖼️ [ProductDetail] Pasando imágenes a ProductImages:', {
+                  productoId: product.id,
+                  tieneImages: !!product.images,
+                  tieneImagenes: !!product.imagenes,
+                  imagesLength: product.images?.length || 0,
+                  imagenesLength: product.imagenes?.length || 0,
+                  imagesToUseLength: imagesToUse.length,
+                  imagesToUse: imagesToUse,
+                  primerElemento: imagesToUse[0],
+                  tipoPrimerElemento: typeof imagesToUse[0]
+                });
+                return imagesToUse;
+              })()}
               style={[styles.productImages, { height: responsiveDims.imageHeight }]}
             />
           </View>

@@ -99,22 +99,65 @@ const isValidImageUrl = (url: string): boolean => {
 
 // Helper para transformar imágenes del backend al formato del frontend
 export const transformProductImages = (product: Product): Product => {
-  if (product.imagenes && Array.isArray(product.imagenes)) {
-    product.images = product.imagenes.map(img => {
+  console.log('🔄 [transformProductImages] Producto recibido:', {
+    id: product.id,
+    nombre: product.nombre,
+    imagenesCount: product.imagenes?.length || 0,
+    imagenesType: Array.isArray(product.imagenes) ? 'array' : typeof product.imagenes,
+    imagenesSample: product.imagenes?.[0],
+    imagesCount: product.images?.length || 0
+  });
+
+  // Inicializar images como array vacío
+  product.images = [];
+
+  if (product.imagenes && Array.isArray(product.imagenes) && product.imagenes.length > 0) {
+    console.log(`📸 [transformProductImages] Procesando ${product.imagenes.length} imagen(es)...`);
+    
+    product.images = product.imagenes.map((img, index) => {
       // Manejar tanto la nueva estructura como la anterior
+      // El backend devuelve objetos con: url, urlImagen, url_imagen (todos con la misma URL completa)
       const imageUrl = img.url || img.urlImagen || img.url_imagen || '';
+      
+      console.log(`  📸 [transformProductImages] Imagen ${index + 1}/${product.imagenes.length}:`, {
+        id: img.id,
+        url: img.url,
+        urlImagen: img.urlImagen,
+        url_imagen: img.url_imagen,
+        finalUrl: imageUrl,
+        tipo: typeof img,
+        esObjeto: typeof img === 'object',
+        isValid: isValidImageUrl(imageUrl)
+      });
       
       // Validar URL antes de incluirla
       if (isValidImageUrl(imageUrl)) {
-        return imageUrl.trim();
+        const trimmedUrl = imageUrl.trim();
+        console.log(`  ✅ [transformProductImages] Imagen ${index + 1} válida:`, trimmedUrl);
+        return trimmedUrl;
       }
       
-      console.warn('⚠️ URL de imagen inválida filtrada:', imageUrl);
+      console.warn(`  ⚠️ [transformProductImages] URL de imagen ${index + 1} inválida filtrada:`, imageUrl);
       return null;
-    }).filter(url => url !== null); // Filtrar URLs inválidas
+    }).filter((url): url is string => url !== null && url !== ''); // Filtrar URLs inválidas
+    
+    console.log('✅ [transformProductImages] Transformación completada:', {
+      productoId: product.id,
+      totalRecibidas: product.imagenes.length,
+      totalValidas: product.images.length,
+      totalFiltradas: product.imagenes.length - product.images.length,
+      urlsFinales: product.images
+    });
   } else {
+    console.warn('⚠️ [transformProductImages] No hay imágenes para transformar:', {
+      productoId: product.id,
+      tieneImagenes: !!product.imagenes,
+      esArray: Array.isArray(product.imagenes),
+      longitud: product.imagenes?.length || 0
+    });
     product.images = [];
   }
+  
   return product;
 };
 

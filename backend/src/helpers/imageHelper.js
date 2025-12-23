@@ -5,72 +5,72 @@ const config = require('../config/env');
  */
 class ImageHelper {
   /**
-   * Valida y limpia una URL de imagen
-   * @param {string} imagePath - Ruta o URL de la imagen
-   * @returns {string|null} URL válida o null si es inválida
+   * Valida y limpia una ruta de imagen del servidor
+   * @param {string} imagePath - Ruta relativa de la imagen
+   * @returns {string|null} Ruta válida o null si es inválida
    */
   static validateAndCleanImageUrl(imagePath) {
     if (!imagePath || typeof imagePath !== 'string') {
       return null;
     }
 
-    // Limpiar espacios y caracteres especiales
     const cleanedPath = imagePath.trim();
     
-    if (cleanedPath === '') {
+    if (!cleanedPath) {
       return null;
     }
 
-    // Si ya es una URL completa, validarla
-    if (cleanedPath.startsWith('http://') || cleanedPath.startsWith('https://')) {
-      try {
-        new URL(cleanedPath);
-        return cleanedPath;
-      } catch (error) {
-        console.warn('⚠️ URL de imagen malformada:', cleanedPath);
-        return null;
-      }
-    }
-
-    // Construir URL completa
-    const baseUrl = config.apiBaseUrl || 'http://192.168.1.106:3001';
-    const cleanPath = cleanedPath.startsWith('/') ? cleanedPath : `/${cleanedPath}`;
-    const fullUrl = `${baseUrl}${cleanPath}`;
-    
-    try {
-      new URL(fullUrl);
-      return fullUrl;
-    } catch (error) {
-      console.warn('⚠️ URL construida malformada:', fullUrl);
-      return null;
-    }
+    // Normalizar ruta: asegurar que comience con /
+    return cleanedPath.startsWith('/') ? cleanedPath : `/${cleanedPath}`;
   }
 
   /**
-   * Construye la URL completa de una imagen
-   * @param {string} imagePath - Ruta relativa de la imagen
-   * @returns {string} URL completa de la imagen
+   * Construye la URL completa de una imagen desde ruta relativa del servidor
+   * @param {string} imagePath - Ruta relativa de la imagen (ej: /uploads/products/123/imagen.jpg)
+   * @returns {string|null} URL completa de la imagen o null si es inválida
    */
   static buildImageUrl(imagePath) {
-    if (!imagePath) {
+    console.log('🔗 [ImageHelper.buildImageUrl] Iniciando construcción de URL:', { imagePath });
+    
+    if (!imagePath || typeof imagePath !== 'string') {
+      console.warn('⚠️ [ImageHelper.buildImageUrl] Ruta inválida:', { imagePath, type: typeof imagePath });
       return null;
     }
 
-    // Si ya es una URL completa, devolverla tal como está
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
+    // Limpiar espacios
+    const cleanPath = imagePath.trim();
+    
+    if (!cleanPath) {
+      console.warn('⚠️ [ImageHelper.buildImageUrl] Ruta vacía después de trim');
+      return null;
     }
 
-    // Construir URL completa usando la configuración
-    const baseUrl = config.apiBaseUrl || 'http://192.168.1.106:3001';
-    
     // Asegurar que la ruta comience con /
-    const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+    const normalizedPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
     
-    // Construir URL final
-    const finalUrl = `${baseUrl}${cleanPath}`;
+    // Obtener base URL del servidor (SIEMPRE IP pública)
+    const baseUrl = config.apiBaseUrl || 'http://181.49.225.64:3001';
     
-    console.log(`🔗 ImageHelper: Construyendo URL de imagen: ${finalUrl}`);
+    // Validar que estamos usando IP pública (no local)
+    if (baseUrl.includes('192.168.') || baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+      console.warn('⚠️ [ImageHelper.buildImageUrl] ADVERTENCIA: Se está usando IP local en lugar de pública:', baseUrl);
+      console.warn('⚠️ [ImageHelper.buildImageUrl] Forzando uso de IP pública: http://181.49.225.64:3001');
+      // Forzar IP pública si detectamos IP local
+      const puerto = baseUrl.split(':').pop() || '3001';
+      return `http://181.49.225.64:${puerto}${normalizedPath}`;
+    }
+    
+    // Construir URL final: baseUrl + ruta normalizada
+    const finalUrl = `${baseUrl}${normalizedPath}`;
+    
+    console.log('✅ [ImageHelper.buildImageUrl] URL construida:', { 
+      rutaOriginal: imagePath, 
+      rutaNormalizada: normalizedPath, 
+      baseUrl, 
+      urlFinal: finalUrl,
+      usandoIPPublica: baseUrl.includes('181.49.225.64')
+    });
+    
     return finalUrl;
   }
 
@@ -159,11 +159,11 @@ class ImageHelper {
   }
 
   /**
-   * Obtiene la URL base de la API
+   * Obtiene la URL base de la API (IP pública)
    * @returns {string} URL base
    */
   static getBaseUrl() {
-    return config.apiBaseUrl || config.app.url || 'http://192.168.1.106:3001';
+    return config.apiBaseUrl || config.app.url || 'http://181.49.225.64:3001';
   }
 
   /**
@@ -181,6 +181,106 @@ class ImageHelper {
     const urlPath = filePath.replace(/^\./, '').replace(/\\/g, '/');
     
     return this.buildImageUrl(urlPath);
+  }
+
+  /**
+   * Formatea una imagen de producto: convierte ruta relativa en URL completa del servidor
+   * @param {Object} img - Objeto imagen de la BD con id, url_imagen, orden, es_principal
+   * @returns {Object|null} Imagen formateada o null si es inválida
+   */
+  static formatProductImage(img) {
+    console.log('🖼️ [ImageHelper.formatProductImage] Procesando imagen:', { 
+      id: img?.id, 
+      url_imagen: img?.url_imagen,
+      orden: img?.orden,
+      es_principal: img?.es_principal
+    });
+    
+    if (!img || !img.url_imagen) {
+      console.warn('⚠️ [ImageHelper.formatProductImage] Imagen o url_imagen faltante:', { img: !!img, url_imagen: !!img?.url_imagen });
+      return null;
+    }
+
+    // Validar que url_imagen sea string válido
+    if (typeof img.url_imagen !== 'string') {
+      console.warn('⚠️ [ImageHelper.formatProductImage] url_imagen no es string:', { 
+        type: typeof img.url_imagen, 
+        value: img.url_imagen 
+      });
+      return null;
+    }
+
+    // Limpiar ruta
+    const imagePath = img.url_imagen.trim();
+    
+    if (!imagePath) {
+      console.warn('⚠️ [ImageHelper.formatProductImage] Ruta vacía después de trim');
+      return null;
+    }
+
+    // Construir URL completa desde ruta relativa del servidor
+    const fullUrl = this.buildImageUrl(imagePath);
+
+    if (!fullUrl) {
+      console.error('❌ [ImageHelper.formatProductImage] No se pudo construir URL completa');
+      return null;
+    }
+
+    const formattedImage = {
+      id: img.id,
+      urlImagen: fullUrl,
+      url: fullUrl,
+      url_imagen: fullUrl,
+      orden: img.orden || 0,
+      es_principal: Boolean(img.es_principal),
+      esPrincipal: Boolean(img.es_principal)
+    };
+    
+    console.log('✅ [ImageHelper.formatProductImage] Imagen formateada exitosamente:', {
+      id: formattedImage.id,
+      urlFinal: formattedImage.urlImagen,
+      orden: formattedImage.orden,
+      esPrincipal: formattedImage.es_principal
+    });
+
+    return formattedImage;
+  }
+
+  /**
+   * Formatea un array de imágenes de producto con URLs completas
+   * @param {Array} images - Array de objetos imagen de la BD
+   * @returns {Array} Array de imágenes formateadas (sin nulls)
+   */
+  static formatProductImages(images) {
+    console.log('📸 [ImageHelper.formatProductImages] Iniciando formateo de imágenes:', {
+      totalImagenes: Array.isArray(images) ? images.length : 0,
+      esArray: Array.isArray(images)
+    });
+    
+    if (!Array.isArray(images)) {
+      console.warn('⚠️ [ImageHelper.formatProductImages] No es un array:', typeof images);
+      return [];
+    }
+
+    if (images.length === 0) {
+      console.log('📭 [ImageHelper.formatProductImages] Array vacío, retornando []');
+      return [];
+    }
+
+    const formattedImages = images
+      .map((img, index) => {
+        console.log(`🔄 [ImageHelper.formatProductImages] Procesando imagen ${index + 1}/${images.length}`);
+        return this.formatProductImage(img);
+      })
+      .filter(img => img !== null);
+    
+    console.log('✅ [ImageHelper.formatProductImages] Formateo completado:', {
+      totalRecibidas: images.length,
+      totalFormateadas: formattedImages.length,
+      totalFiltradas: images.length - formattedImages.length
+    });
+
+    return formattedImages;
   }
 }
 

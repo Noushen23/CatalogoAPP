@@ -1,7 +1,6 @@
 const Category = require('../models/Category');
-const { saveBase64Image, deleteImage } = require('../middleware/upload');
-const path = require('path');
-const fs = require('fs').promises;
+const ImageHelper = require('../helpers/imageHelper');
+const { query } = require('../config/database');
 
 class CategoryController {
   /**
@@ -98,7 +97,6 @@ class CategoryController {
       const products = await category.getProducts(filters);
 
       // Formatear productos con imágenes validadas
-      const baseUrl = process.env.APP_URL || 'http://192.168.1.106:3001';
       const formattedProducts = await Promise.all(
         products.map(async (product) => {
           // Obtener imágenes del producto
@@ -110,55 +108,8 @@ class CategoryController {
           `;
           const images = await query(imagesQuery, [product.id]);
           
-          // Formatear imágenes con validación
-          const formattedImages = images.map(img => {
-            // Validar y limpiar URL de imagen
-            let imageUrl = img.url_imagen;
-            
-            // Si no hay URL, saltar esta imagen
-            if (!imageUrl || typeof imageUrl !== 'string') {
-              console.warn('⚠️ URL de imagen inválida en getCategoryProducts:', imageUrl);
-              return null;
-            }
-            
-            // Limpiar URL de espacios y caracteres especiales
-            imageUrl = imageUrl.trim();
-            
-            // Si ya es una URL completa, validarla
-            if (imageUrl.startsWith('http')) {
-              try {
-                new URL(imageUrl); // Validar URL
-                return {
-                  id: img.id,
-                  urlImagen: imageUrl,
-                  url: imageUrl, // Para compatibilidad con el frontend
-                  orden: img.orden,
-                  es_principal: Boolean(img.es_principal)
-                };
-              } catch (urlError) {
-                console.warn('⚠️ URL de imagen malformada en getCategoryProducts:', imageUrl);
-                return null;
-              }
-            }
-            
-            // Construir URL completa
-            const cleanPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-            const fullUrl = `${baseUrl}${cleanPath}`;
-            
-            try {
-              new URL(fullUrl); // Validar URL construida
-              return {
-                id: img.id,
-                urlImagen: fullUrl,
-                url: fullUrl, // Para compatibilidad con el frontend
-                orden: img.orden,
-                es_principal: Boolean(img.es_principal)
-              };
-            } catch (urlError) {
-              console.warn('⚠️ URL construida malformada en getCategoryProducts:', fullUrl);
-              return null;
-            }
-          }).filter(img => img !== null); // Filtrar imágenes inválidas
+          // Usar ImageHelper para formatear todas las imágenes de forma centralizada
+          const formattedImages = ImageHelper.formatProductImages(images);
 
           return {
             id: product.id,
@@ -216,18 +167,9 @@ class CategoryController {
     try {
       const categoryData = req.body;
       
-      // Si se proporciona una imagen en base64, guardarla localmente
-      if (categoryData.imagenUrl && categoryData.imagenUrl.startsWith('data:image/')) {
-        try {
-          console.log('📸 Guardando imagen base64 localmente...');
-          const imagePath = await saveBase64Image(categoryData.imagenUrl, categoryData.nombre);
-          categoryData.imagenUrl = imagePath;
-          console.log('✅ Imagen guardada en:', imagePath);
-        } catch (imageError) {
-          console.error('❌ Error al guardar imagen:', imageError);
-          // Continuar sin imagen si hay error
-          categoryData.imagenUrl = null;
-        }
+      // Eliminar imagenUrl si se proporciona (las categorías no tienen imágenes)
+      if (categoryData.imagenUrl !== undefined) {
+        delete categoryData.imagenUrl;
       }
       
       const category = await Category.create(categoryData);
@@ -265,41 +207,9 @@ class CategoryController {
         });
       }
 
-      // Guardar la imagen anterior para posible eliminación
-      const previousImageUrl = category.imagenUrl;
-
-      // Si se proporciona una nueva imagen en base64, guardarla localmente
-      if (updateData.imagenUrl && updateData.imagenUrl.startsWith('data:image/')) {
-        try {
-          console.log('📸 Guardando nueva imagen base64...');
-          const imagePath = await saveBase64Image(updateData.imagenUrl, updateData.nombre || category.nombre);
-          updateData.imagenUrl = imagePath;
-          console.log('✅ Nueva imagen guardada en:', imagePath);
-
-          // Eliminar imagen anterior si existe y es diferente
-          if (previousImageUrl && previousImageUrl !== imagePath) {
-            try {
-              await deleteImage(previousImageUrl);
-              console.log('🗑️ Imagen anterior eliminada');
-            } catch (deleteError) {
-              console.warn('⚠️ No se pudo eliminar la imagen anterior:', deleteError.message);
-            }
-          }
-        } catch (imageError) {
-          console.error('❌ Error al guardar nueva imagen:', imageError);
-          // Mantener imagen anterior si hay error
-          updateData.imagenUrl = previousImageUrl;
-        }
-      } else if (updateData.imagenUrl === null || updateData.imagenUrl === '') {
-        // Si se quiere eliminar la imagen
-        if (previousImageUrl) {
-          try {
-            await deleteImage(previousImageUrl);
-            console.log('🗑️ Imagen eliminada por solicitud del usuario');
-          } catch (deleteError) {
-            console.warn('⚠️ No se pudo eliminar la imagen:', deleteError.message);
-          }
-        }
+      // Eliminar imagenUrl si se proporciona (las categorías no tienen imágenes)
+      if (updateData.imagenUrl !== undefined) {
+        delete updateData.imagenUrl;
       }
 
       // Actualizar la categoría
@@ -338,8 +248,8 @@ class CategoryController {
         });
       }
 
-      // Solo actualizar campos que se proporcionen
-      const allowedFields = ['nombre', 'descripcion', 'imagenUrl', 'activa', 'orden'];
+      // Solo actualizar campos que se proporcionen (sin imagenUrl)
+      const allowedFields = ['nombre', 'descripcion', 'activa', 'orden'];
       const filteredData = {};
 
       for (const [key, value] of Object.entries(updateData)) {
@@ -348,36 +258,16 @@ class CategoryController {
         }
       }
 
+      // Eliminar imagenUrl si se proporciona (las categorías no tienen imágenes)
+      if (updateData.imagenUrl !== undefined) {
+        delete updateData.imagenUrl;
+      }
+
       if (Object.keys(filteredData).length === 0) {
         return res.status(400).json({
           success: false,
           message: 'No se proporcionaron campos válidos para actualizar'
         });
-      }
-
-      // Manejar imagen si se proporciona
-      if (filteredData.imagenUrl && filteredData.imagenUrl.startsWith('data:image/')) {
-        const previousImageUrl = category.imagenUrl;
-        
-        try {
-          console.log('📸 Guardando nueva imagen base64...');
-          const imagePath = await saveBase64Image(filteredData.imagenUrl, filteredData.nombre || category.nombre);
-          filteredData.imagenUrl = imagePath;
-          console.log('✅ Nueva imagen guardada en:', imagePath);
-
-          // Eliminar imagen anterior si existe
-          if (previousImageUrl && previousImageUrl !== imagePath) {
-            try {
-              await deleteImage(previousImageUrl);
-              console.log('🗑️ Imagen anterior eliminada');
-            } catch (deleteError) {
-              console.warn('⚠️ No se pudo eliminar la imagen anterior:', deleteError.message);
-            }
-          }
-        } catch (imageError) {
-          console.error('❌ Error al guardar nueva imagen:', imageError);
-          filteredData.imagenUrl = category.imagenUrl; // Mantener imagen anterior
-        }
       }
 
       const updatedCategory = await category.update(filteredData);
@@ -464,39 +354,6 @@ class CategoryController {
 
     } catch (error) {
       console.error('Error al reordenar categorías:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor'
-      });
-    }
-  }
-
-  /**
-   * Subir imagen de categoría
-   */
-  static async uploadCategoryImage(req, res) {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'No se proporcionó ningún archivo'
-        });
-      }
-
-      // Generar URL de la imagen
-      const imageUrl = `/uploads/categories/${req.file.filename}`;
-
-      res.json({
-        success: true,
-        message: 'Imagen subida exitosamente',
-        data: {
-          url: imageUrl,
-          filename: req.file.filename
-        }
-      });
-
-    } catch (error) {
-      console.error('Error al subir imagen:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'

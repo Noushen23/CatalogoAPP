@@ -1,5 +1,6 @@
 const { query, getConnection } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const ImageHelper = require('../helpers/imageHelper');
 
 class Product {
   constructor(data) {
@@ -359,52 +360,8 @@ class Product {
     let images = [];
     if (includeImages) {
       const rawImages = await this.getImages();
-      // Generar URLs completas para las imágenes con validación
-      const baseUrl = process.env.APP_URL || 'http://192.168.1.106:3001';
-      images = rawImages.map(img => {
-        // Validar y limpiar URL de imagen
-        let imageUrl = img.url_imagen;
-        
-        // Si no hay URL, saltar esta imagen
-        if (!imageUrl || typeof imageUrl !== 'string') {
-          console.warn('⚠️ URL de imagen inválida en toPublicObject:', imageUrl);
-          return null;
-        }
-        
-        // Limpiar URL de espacios y caracteres especiales
-        imageUrl = imageUrl.trim();
-        
-        // Si ya es una URL completa, validarla
-        if (imageUrl.startsWith('http')) {
-          try {
-            new URL(imageUrl); // Validar URL
-            return {
-              ...img,
-              urlImagen: imageUrl,
-              url: imageUrl // Para compatibilidad con el frontend
-            };
-          } catch (urlError) {
-            console.warn('⚠️ URL de imagen malformada en toPublicObject:', imageUrl);
-            return null;
-          }
-        }
-        
-        // Construir URL completa
-        const cleanPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-        const fullUrl = `${baseUrl}${cleanPath}`;
-        
-        try {
-          new URL(fullUrl); // Validar URL construida
-          return {
-            ...img,
-            urlImagen: fullUrl,
-            url: fullUrl // Para compatibilidad con el frontend
-          };
-        } catch (urlError) {
-          console.warn('⚠️ URL construida malformada en toPublicObject:', fullUrl);
-          return null;
-        }
-      }).filter(img => img !== null); // Filtrar imágenes inválidas
+      // Usar ImageHelper para formatear todas las imágenes de forma centralizada
+      images = ImageHelper.formatProductImages(rawImages);
     }
 
     // Obtener estadísticas de reseñas si se solicitan

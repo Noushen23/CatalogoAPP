@@ -98,24 +98,55 @@ const ProductItem = memo(({ product }: { product: Product }) => {
     }
   }, [product.id, isFavorite, toggleFavorite]);
 
+  // Debug: Log de imágenes del producto en catálogo
+  React.useEffect(() => {
+    console.log('🖼️ [Catalog] Imágenes del producto:', {
+      productoId: product.id,
+      nombre: product.nombre,
+      tieneImages: !!product.images,
+      tieneImagenes: !!product.imagenes,
+      imagesLength: product.images?.length || 0,
+      imagenesLength: product.imagenes?.length || 0,
+      images: product.images,
+      imagenes: product.imagenes,
+      primerImage: product.images?.[0],
+      primerImagen: product.imagenes?.[0]
+    });
+  }, [product.id, product.images, product.imagenes]);
+
   const imageUrl = product.images && product.images.length > 0 ? product.images[0] : null;
 
   // Validar URL de imagen antes de renderizar
   const isValidImageUrl = (url: string | null): boolean => {
-    if (!url || typeof url !== 'string') return false;
+    if (!url || typeof url !== 'string') {
+      console.warn('⚠️ [Catalog] URL inválida (no string):', { url, type: typeof url });
+      return false;
+    }
     
     const trimmedUrl = url.trim();
-    if (trimmedUrl === '') return false;
+    if (trimmedUrl === '') {
+      console.warn('⚠️ [Catalog] URL vacía después de trim');
+      return false;
+    }
     
     try {
       new URL(trimmedUrl);
       return true;
-    } catch {
+    } catch (error) {
+      console.warn('⚠️ [Catalog] URL malformada:', { url: trimmedUrl, error });
       return false;
     }
   };
 
   const shouldShowImage = isValidImageUrl(imageUrl);
+  
+  if (!shouldShowImage && imageUrl) {
+    console.warn('⚠️ [Catalog] No se mostrará imagen para producto:', {
+      productoId: product.id,
+      imageUrl,
+      reason: !imageUrl ? 'URL null' : typeof imageUrl !== 'string' ? 'No es string' : 'URL inválida'
+    });
+  }
 
   return (
     <TouchableOpacity

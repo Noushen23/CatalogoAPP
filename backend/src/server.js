@@ -249,7 +249,8 @@ const startServer = async () => {
       console.log('🚀 Servidor iniciado');
       console.log(`📡 Puerto: ${config.port}`);
       console.log(`🌍 Entorno: ${config.nodeEnv}`);
-      console.log(`🔗 URL: ${config.app.url}`);
+      console.log(`🔗 URL App: ${config.app.url}`);
+      console.log(`🖼️  URL Base Imágenes (IP PÚBLICA): ${config.apiBaseUrl}`);
       console.log(`📊 Health Check: ${config.app.url}/health`);
       console.log(`🔐 API Auth: ${config.app.url}/api/v1/auth`);
       console.log(`🛍️  API Products: ${config.app.url}/api/v1/products`);

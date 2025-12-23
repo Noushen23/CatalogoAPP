@@ -39,11 +39,13 @@ const ProductImages = ({ images, style }: Props) => {
 
   // Debug: Log de imágenes recibidas
   useEffect(() => {
-    console.log('🖼️ ProductImages - Imágenes recibidas:', {
+    console.log('🖼️ [ProductImages] Imágenes recibidas:', {
       total: images?.length || 0,
-      type: Array.isArray(images) ? (typeof images[0]) : 'not array',
-      sample: images?.[0],
-      all: images
+      esArray: Array.isArray(images),
+      tipoPrimerElemento: images?.[0] ? typeof images[0] : 'undefined',
+      primerElemento: images?.[0],
+      todosLosElementos: images,
+      estructuraCompleta: JSON.stringify(images, null, 2)
     });
   }, [images]);
 

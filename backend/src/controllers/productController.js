@@ -6,19 +6,14 @@ const path = require('path');
 const imageProcessor = require('../services/imageProcessor');
 const { query, getConnection, transaction } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const ImageHelper = require('../helpers/imageHelper');
 
 class ProductController {
   // Obtener todos los productos
   static async getProducts(req, res) {
     try {
       const { 
-        categoriaId, 
-        precioMin,
-        precioMax,
-        calificacionMin,
-        enOferta,
-        search,
-        stockFilter,
+        categoriaId, precioMin, precioMax, calificacionMin, enOferta, search, stockFilter,
         esServicio, // Nuevo filtro para servicios
         es_servicio, // Alias alternativo
         activo, // Filtro para productos activos/inactivos
@@ -153,27 +148,11 @@ class ProductController {
       
       const productsQuery = `
         SELECT
-          p.id,
-          p.nombre,
-          p.descripcion,
-          p.precio,
-          p.precio_oferta,
-          p.en_oferta,
-          p.categoria_id,
-          p.stock,
-          p.stock_minimo,
-          p.activo,
-          p.destacado,
-          p.codigo_barras,
-          p.sku,
-          p.ventas_totales,
-          p.calificacion_promedio,
-          p.total_resenas,
-          p.es_servicio,
-          p.fecha_creacion,
-          p.fecha_actualizacion,
-          c.nombre as categoriaNombre,
-          p.etiquetas as etiquetas_raw
+          p.id, p.nombre, p.descripcion, p.precio, p.precio_oferta, p.en_oferta,
+          p.categoria_id, p.stock, p.stock_minimo, p.activo, p.destacado, p.codigo_barras,
+          p.sku, p.ventas_totales, p.calificacion_promedio, p.total_resenas, p.es_servicio,
+          p.fecha_creacion, p.fecha_actualizacion,
+          c.nombre as categoriaNombre, p.etiquetas as etiquetas_raw
         FROM productos p
         LEFT JOIN categorias c ON p.categoria_id = c.id
         WHERE ${whereClause}
@@ -191,13 +170,14 @@ class ProductController {
       }
 
       // Obtener imágenes para todos los productos de forma separada (más confiable)
-      const config = require('../config/env');
-      const baseUrl = config.apiBaseUrl || process.env.APP_URL || 'http://192.168.1.106:3001';
+      console.log('📦 [getProducts] Iniciando obtención de imágenes para', products.length, 'productos');
       
       const formattedProducts = await Promise.all(products.map(async (product) => {
         // Obtener imágenes del producto de forma separada
         let imagenes = [];
         try {
+          console.log(`🔍 [getProducts] Consultando imágenes para producto ${product.id}`);
+          
           const imagesQuery = `
             SELECT id, url_imagen, orden, es_principal
             FROM imagenes_producto
@@ -206,61 +186,24 @@ class ProductController {
           `;
           const images = await query(imagesQuery, [product.id]);
           
-          imagenes = images.map(img => {
-            // Obtener URL de imagen desde la BD
-            let imageUrl = img.url_imagen;
-            
-            // Si no hay URL o no es string válido, saltar
-            if (!imageUrl || typeof imageUrl !== 'string') {
-              return null;
-            }
-            
-            // Limpiar URL de espacios
-            imageUrl = imageUrl.trim();
-            
-            // Si está vacía después de trim, saltar
-            if (!imageUrl) {
-              return null;
-            }
-            
-            // Si ya es una URL completa (http:// o https://), usarla directamente
-            if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-              return {
-                id: img.id,
-                urlImagen: imageUrl,
-                url: imageUrl, // Para compatibilidad con el frontend
-                orden: img.orden || 0,
-                es_principal: Boolean(img.es_principal)
-              };
-            }
-            
-            // Construir URL completa para rutas relativas
-            // Asegurar que la ruta comience con /
-            let cleanPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-            
-            // Si la ruta no incluye el productId pero debería (formato antiguo)
-            // Intentar corregir la ruta si es necesario
-            // Formato esperado: /uploads/products/{productId}/imagen.jpg
-            // Formato antiguo: /uploads/products/imagen.jpg
-            if (cleanPath.startsWith('/uploads/products/') && !cleanPath.includes(`/${product.id}/`)) {
-              // Extraer el nombre del archivo
-              const fileName = cleanPath.split('/').pop();
-              // Construir la ruta correcta con el productId
-              cleanPath = `/uploads/products/${product.id}/${fileName}`;
-            }
-            
-            const fullUrl = `${baseUrl}${cleanPath}`;
-            
-            return {
-              id: img.id,
-              urlImagen: fullUrl,
-              url: fullUrl, // Para compatibilidad con el frontend
-              orden: img.orden || 0,
-              es_principal: Boolean(img.es_principal)
-            };
-          }).filter(img => img !== null); // Solo filtrar nulls (URLs inválidas)
+          console.log(`📊 [getProducts] Producto ${product.id}: ${images.length} imagen(es) encontrada(s) en BD`);
+          if (images.length > 0) {
+            console.log(`📋 [getProducts] URLs en BD para producto ${product.id}:`, 
+              images.map(img => ({ id: img.id, url: img.url_imagen, orden: img.orden }))
+            );
+          }
+          
+          // Usar ImageHelper para formatear todas las imágenes de forma centralizada
+          imagenes = ImageHelper.formatProductImages(images);
+          
+          console.log(`✅ [getProducts] Producto ${product.id}: ${imagenes.length} imagen(es) formateada(s)`);
+          if (imagenes.length > 0) {
+            console.log(`📤 [getProducts] URLs finales para producto ${product.id}:`, 
+              imagenes.map(img => ({ id: img.id, url: img.urlImagen, orden: img.orden }))
+            );
+          }
         } catch (error) {
-          console.warn('⚠️ Error obteniendo imágenes para producto:', product.id, error.message);
+          console.error(`❌ [getProducts] Error obteniendo imágenes para producto ${product.id}:`, error.message);
           imagenes = [];
         }
         
@@ -366,8 +309,8 @@ class ProductController {
       const product = products[0];
       
       // Obtener imágenes del producto de forma separada (más confiable)
-      const config = require('../config/env');
-      const baseUrl = config.apiBaseUrl || process.env.APP_URL || 'http://192.168.1.106:3001';
+      console.log(`🖼️ [getProductById] Iniciando obtención de imágenes para producto ${id}`);
+      
       let imagenes = [];
       try {
         const imagesQuery = `
@@ -376,74 +319,39 @@ class ProductController {
           WHERE producto_id = ?
           ORDER BY orden ASC
         `;
+        
+        console.log(`🔍 [getProductById] Ejecutando consulta SQL para producto ${id}`);
         const images = await query(imagesQuery, [id]);
         
-        console.log(`📸 Producto ${id}: ${images.length} imágenes encontradas en BD`);
-        console.log(`📋 URLs en BD:`, images.map(img => img.url_imagen));
+        console.log(`📊 [getProductById] Producto ${id}: ${images.length} imagen(es) encontrada(s) en BD`);
+        if (images.length > 0) {
+          console.log(`📋 [getProductById] URLs en BD para producto ${id}:`, 
+            images.map(img => ({ 
+              id: img.id, 
+              url_imagen: img.url_imagen, 
+              orden: img.orden, 
+              es_principal: img.es_principal 
+            }))
+          );
+        }
         
-        imagenes = images.map((img) => {
-          // Obtener URL de imagen desde la BD
-          let imageUrl = img.url_imagen;
-          
-          // Si no hay URL o no es string válido, saltar
-          if (!imageUrl || typeof imageUrl !== 'string') {
-            return null;
-          }
-          
-          // Limpiar URL de espacios
-          imageUrl = imageUrl.trim();
-          
-          // Si está vacía después de trim, saltar
-          if (!imageUrl) {
-            return null;
-          }
-          
-          // Si ya es una URL completa (http:// o https://), usarla directamente
-          if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-            return {
-              id: img.id,
-              urlImagen: imageUrl,
-              url: imageUrl, // Para compatibilidad con el frontend
-              url_imagen: imageUrl, // Campo adicional para compatibilidad
-              orden: img.orden || 0,
-              es_principal: Boolean(img.es_principal),
-              esPrincipal: Boolean(img.es_principal) // Campo adicional para compatibilidad
-            };
-          }
-          
-          // Construir URL completa para rutas relativas
-          // Asegurar que la ruta comience con /
-          let cleanPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-          
-          // Si la ruta no incluye el productId pero debería (formato antiguo)
-          // Intentar corregir la ruta si es necesario
-          // Formato esperado: /uploads/products/{productId}/imagen.jpg
-          // Formato antiguo: /uploads/products/imagen.jpg
-          if (cleanPath.startsWith('/uploads/products/') && !cleanPath.includes(`/${id}/`)) {
-            // Extraer el nombre del archivo
-            const fileName = cleanPath.split('/').pop();
-            // Construir la ruta correcta con el productId
-            cleanPath = `/uploads/products/${id}/${fileName}`;
-            console.log(`🔧 Ruta corregida: ${imageUrl} -> ${cleanPath}`);
-          }
-          
-          const fullUrl = `${baseUrl}${cleanPath}`;
-          
-          return {
-            id: img.id,
-            urlImagen: fullUrl,
-            url: fullUrl, // Para compatibilidad con el frontend
-            url_imagen: fullUrl, // Campo adicional para compatibilidad
-            orden: img.orden || 0,
-            es_principal: Boolean(img.es_principal),
-            esPrincipal: Boolean(img.es_principal) // Campo adicional para compatibilidad
-          };
-        }).filter(img => img !== null); // Solo filtrar nulls (URLs inválidas)
+        // Usar ImageHelper para formatear todas las imágenes de forma centralizada
+        console.log(`🔄 [getProductById] Formateando imágenes para producto ${id}`);
+        imagenes = ImageHelper.formatProductImages(images);
         
-        console.log(`✅ Producto ${id}: ${imagenes.length} imágenes procesadas y enviadas`);
-        console.log(`📤 URLs finales:`, imagenes.map(img => img.urlImagen));
+        console.log(`✅ [getProductById] Producto ${id}: ${imagenes.length} imagen(es) procesada(s) y enviada(s)`);
+        if (imagenes.length > 0) {
+          console.log(`📤 [getProductById] URLs finales para producto ${id}:`, 
+            imagenes.map(img => ({ 
+              id: img.id, 
+              url: img.urlImagen, 
+              orden: img.orden, 
+              esPrincipal: img.esPrincipal 
+            }))
+          );
+        }
       } catch (error) {
-        console.warn('⚠️ Error obteniendo imágenes para producto:', id, error.message);
+        console.error(`❌ [getProductById] Error obteniendo imágenes para producto ${id}:`, error.message);
         imagenes = [];
       }
       
@@ -640,32 +548,79 @@ class ProductController {
 
         // 2. Insertar en `producto_imagenes`
         if (imagenes && imagenes.length > 0) {
-          console.log(` Procesando ${imagenes.length} imagen(es) para producto...`);
+          console.log(`📸 [createProduct] Procesando ${imagenes.length} imagen(es) para producto ${productId}...`);
+          
+          // Crear directorio específico para este producto
+          const productUploadsDir = path.join(__dirname, '../../uploads/products', productId);
+          console.log(`📁 [createProduct] Creando directorio para imágenes:`, productUploadsDir);
+          await fs.mkdir(productUploadsDir, { recursive: true });
+          console.log(`✅ [createProduct] Directorio creado exitosamente`);
           
           for (let i = 0; i < imagenes.length; i++) {
+            console.log(`🖼️ [createProduct] Procesando imagen ${i + 1}/${imagenes.length} para producto ${productId}`);
             const imageData = imagenes[i];
             let imageUrl = imageData;
             
             // Si es base64, convertir a archivo
-            if (imageData.startsWith('data:image/')) {
+            if (typeof imageData === 'string' && imageData.startsWith('data:image/')) {
               const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
               const buffer = Buffer.from(base64Data, 'base64');
               const ext = imageData.split(';')[0].split('/')[1];
-              const filename = `product_${Date.now()}_${i}.${ext}`.replace(/\s+/g, '_');
-              const uploadsDir = path.join(__dirname, '../../uploads/products');
-              await fs.mkdir(uploadsDir, { recursive: true });
-              const filePath = path.join(uploadsDir, filename);
+              const filename = `product_${Date.now()}_${i}_optimized.${ext}`.replace(/\s+/g, '_');
               
-              await fs.writeFile(filePath, buffer);
-              imageUrl = `/uploads/products/${filename}`;
+              // Guardar buffer temporalmente para optimizar
+              const tempPath = path.join(productUploadsDir, `temp_${filename}`);
+              const finalPath = path.join(productUploadsDir, filename);
+              await fs.writeFile(tempPath, buffer);
+              
+              // Optimizar imagen con Sharp si está disponible
+              try {
+                await imageProcessor.optimizeImage(tempPath, finalPath);
+                await fs.unlink(tempPath); // Eliminar temporal
+              } catch (optimizeError) {
+                // Si falla la optimización, renombrar el temporal
+                await fs.rename(tempPath, finalPath);
+              }
+              
+              imageUrl = `/uploads/products/${productId}/${filename}`;
               console.log(`✅ Imagen ${i + 1} guardada: ${imageUrl}`);
+            } else if (typeof imageData === 'string' && (imageData.startsWith('/uploads/') || imageData.startsWith('http'))) {
+              // Si ya viene como ruta, conservarla tal cual
+              // Normalizar a ruta relativa si es necesario
+              if (imageData.startsWith('http')) {
+                // Si es URL completa, extraer solo la ruta relativa
+                const urlObj = new URL(imageData);
+                imageUrl = urlObj.pathname;
+              } else {
+                imageUrl = imageData;
+              }
+              console.log(`📋 Imagen ${i + 1} conservada (ruta existente): ${imageUrl}`);
+            } else if (typeof imageData === 'object' && imageData.url_imagen) {
+              // Si viene como objeto con url_imagen, usar esa ruta
+              imageUrl = imageData.url_imagen;
+              console.log(`📋 Imagen ${i + 1} conservada (objeto con ruta): ${imageUrl}`);
             }
 
+            const imageId = uuidv4();
+            console.log(`💾 [createProduct] Guardando imagen ${i + 1} en BD:`, {
+              id: imageId,
+              productoId: productId,
+              url_imagen: imageUrl,
+              orden: i,
+              es_principal: i === 0
+            });
+            
             await connection.execute(
               'INSERT INTO imagenes_producto (id, producto_id, url_imagen, orden, es_principal) VALUES (?, ?, ?, ?, ?)',
-              [uuidv4(), productId, imageUrl, i, i === 0]
+              [imageId, productId, imageUrl, i, i === 0]
             );
+            
+            console.log(`✅ [createProduct] Imagen ${i + 1} guardada en BD exitosamente`);
           }
+          
+          console.log(`✅ [createProduct] Todas las imágenes procesadas para producto ${productId}`);
+        } else {
+          console.log(`📭 [createProduct] No hay imágenes para procesar en producto ${productId}`);
         }
 
         // 3. Actualizar etiquetas como JSON en la tabla productos
@@ -704,53 +659,36 @@ class ProductController {
 
       const products = await query(productQuery, [productId]);
       const product = products[0];
-      const baseUrl = process.env.APP_URL || 'http://192.168.1.106:3001';
 
       // Parsear imágenes y etiquetas desde GROUP_CONCAT
+      console.log(`🔄 [createProduct] Formateando imágenes del producto creado ${productId}`);
       let imagenesFormateadas = [];
       if (product.imagenes_raw) {
         try {
+          console.log(`📋 [createProduct] Imágenes raw encontradas:`, product.imagenes_raw);
           const imagenesArray = JSON.parse(`[${product.imagenes_raw}]`);
-          imagenesFormateadas = imagenesArray.map(img => {
-            // Validar y limpiar URL de imagen
-            let imageUrl = img.url;
-            
-            // Si no hay URL, saltar esta imagen
-            if (!imageUrl || typeof imageUrl !== 'string') {
-              console.warn('⚠️ URL de imagen inválida:', imageUrl);
-              return null;
-            }
-            
-            // Limpiar URL de espacios y caracteres especiales
-            imageUrl = imageUrl.trim();
-            
-            // Si ya es una URL completa, validarla
-            if (imageUrl.startsWith('http')) {
-              try {
-                new URL(imageUrl); // Validar URL
-                return { ...img, url: imageUrl };
-              } catch (urlError) {
-                console.warn('⚠️ URL de imagen malformada:', imageUrl);
-                return null;
-              }
-            }
-            
-            // Construir URL completa
-            const cleanPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-            const fullUrl = `${baseUrl}${cleanPath}`;
-            
-            try {
-              new URL(fullUrl); // Validar URL construida
-              return { ...img, url: fullUrl };
-            } catch (urlError) {
-              console.warn('⚠️ URL construida malformada:', fullUrl);
-              return null;
-            }
+          console.log(`📊 [createProduct] ${imagenesArray.length} imagen(es) parseada(s) desde GROUP_CONCAT`);
+          
+          // Usar ImageHelper para formatear todas las imágenes de forma centralizada
+          imagenesFormateadas = imagenesArray.map((img, idx) => {
+            console.log(`🖼️ [createProduct] Formateando imagen ${idx + 1}/${imagenesArray.length}`);
+            // Convertir el formato del GROUP_CONCAT al formato esperado por ImageHelper
+            const imageObj = {
+              id: img.id,
+              url_imagen: img.url,
+              orden: img.orden || 0,
+              es_principal: Boolean(img.es_principal)
+            };
+            return ImageHelper.formatProductImage(imageObj);
           }).filter(img => img !== null); // Filtrar imágenes inválidas
+          
+          console.log(`✅ [createProduct] ${imagenesFormateadas.length} imagen(es) formateada(s) exitosamente`);
         } catch (error) {
-          console.warn('Error parseando imágenes:', error);
+          console.error(`❌ [createProduct] Error parseando imágenes:`, error.message);
           imagenesFormateadas = [];
         }
+      } else {
+        console.log(`📭 [createProduct] No hay imágenes raw para formatear`);
       }
       
       let etiquetasFormateadas = [];
@@ -958,43 +896,127 @@ class ProductController {
 
         // 2. Sincronizar imágenes: Solo si se proporcionan imágenes explícitamente
         if (imagenes !== undefined) {
-          console.log(`🔄 Sincronizando imágenes para producto ${id}...`);
+          console.log(`🔄 [updateProduct] Sincronizando imágenes para producto ${id}...`);
+          console.log(`📊 [updateProduct] Imágenes recibidas:`, {
+            total: imagenes?.length || 0,
+            tipo: Array.isArray(imagenes) ? 'array' : typeof imagenes
+          });
           
-          // Eliminar imágenes existentes siempre que se envíe el campo imagenes
+          // Obtener imágenes existentes antes de eliminarlas (para borrar archivos físicos)
+          console.log(`🔍 [updateProduct] Obteniendo imágenes existentes del producto ${id}...`);
+          const existingImagesQuery = 'SELECT url_imagen FROM imagenes_producto WHERE producto_id = ?';
+          const existingImages = await connection.query(existingImagesQuery, [id]);
+          
+          console.log(`📋 [updateProduct] Imágenes existentes encontradas:`, {
+            total: existingImages?.length || 0,
+            urls: existingImages?.map(img => img.url_imagen) || []
+          });
+          
+          // Eliminar imágenes existentes de la base de datos
+          console.log(`🗑️ [updateProduct] Eliminando imágenes existentes de la BD para producto ${id}...`);
           await connection.execute('DELETE FROM imagenes_producto WHERE producto_id = ?', [id]);
+          console.log(`✅ [updateProduct] Imágenes eliminadas de la BD`);
+          
+          // Eliminar archivos físicos de las imágenes antiguas
+          if (existingImages && existingImages.length > 0) {
+            console.log(`🗑️ [updateProduct] Eliminando ${existingImages.length} archivo(s) físico(s)...`);
+            for (const oldImage of existingImages) {
+              if (oldImage.url_imagen && oldImage.url_imagen.startsWith('/uploads/')) {
+                try {
+                  const oldFilePath = path.join(__dirname, '../../', oldImage.url_imagen);
+                  console.log(`🗑️ [updateProduct] Eliminando archivo:`, oldFilePath);
+                  await fs.unlink(oldFilePath);
+                  console.log(`✅ [updateProduct] Archivo antiguo eliminado: ${oldImage.url_imagen}`);
+                } catch (fileError) {
+                  console.warn(`⚠️ [updateProduct] No se pudo eliminar archivo antiguo ${oldImage.url_imagen}:`, fileError.message);
+                }
+              }
+            }
+          } else {
+            console.log(`📭 [updateProduct] No hay archivos físicos antiguos para eliminar`);
+          }
           
           // Insertar nuevas imágenes si las hay
           if (imagenes && imagenes.length > 0) {
+            console.log(`📸 [updateProduct] Procesando ${imagenes.length} nueva(s) imagen(es)...`);
+            
+            // Crear directorio específico para este producto
+            const productUploadsDir = path.join(__dirname, '../../uploads/products', id);
+            console.log(`📁 [updateProduct] Creando/verificando directorio:`, productUploadsDir);
+            await fs.mkdir(productUploadsDir, { recursive: true });
+            console.log(`✅ [updateProduct] Directorio listo`);
+            
             for (let i = 0; i < imagenes.length; i++) {
+              console.log(`🖼️ [updateProduct] Procesando imagen ${i + 1}/${imagenes.length}...`);
               const imageData = imagenes[i];
               let imageUrl = imageData;
               
               // Si es base64, convertir a archivo
-              if (imageData.startsWith('data:image/')) {
+              if (typeof imageData === 'string' && imageData.startsWith('data:image/')) {
                 const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
                 const buffer = Buffer.from(base64Data, 'base64');
                 const ext = imageData.split(';')[0].split('/')[1];
-                const filename = `product_${Date.now()}_${i}.${ext}`.replace(/\s+/g, '_');
-                const uploadsDir = path.join(__dirname, '../../uploads/products');
-                await fs.mkdir(uploadsDir, { recursive: true });
-                const filePath = path.join(uploadsDir, filename);
+                const filename = `product_${Date.now()}_${i}_optimized.${ext}`.replace(/\s+/g, '_');
+                const filePath = path.join(productUploadsDir, filename);
                 
-                await fs.writeFile(filePath, buffer);
-                imageUrl = `/uploads/products/${filename}`;
-                console.log(`✅ Imagen ${i + 1} actualizada: ${imageUrl}`);
+                // Guardar buffer temporalmente para optimizar
+                const tempPath = path.join(productUploadsDir, `temp_${filename}`);
+                await fs.writeFile(tempPath, buffer);
+                
+                // Optimizar imagen con Sharp si está disponible
+                try {
+                  await imageProcessor.optimizeImage(tempPath, filePath);
+                  await fs.unlink(tempPath); // Eliminar temporal
+                } catch (optimizeError) {
+                  // Si falla la optimización, renombrar el temporal
+                  await fs.rename(tempPath, filePath);
+                }
+                
+                imageUrl = `/uploads/products/${id}/${filename}`;
+                console.log(`✅ Imagen ${i + 1} guardada: ${imageUrl}`);
+              } else if (typeof imageData === 'string' && (imageData.startsWith('/uploads/') || imageData.startsWith('http'))) {
+                // Si ya viene como ruta, conservarla tal cual
+                // Normalizar a ruta relativa si es necesario
+                if (imageData.startsWith('http')) {
+                  // Si es URL completa, extraer solo la ruta relativa
+                  try {
+                    const urlObj = new URL(imageData);
+                    imageUrl = urlObj.pathname;
+                  } catch (urlError) {
+                    imageUrl = imageData;
+                  }
+                } else {
+                  imageUrl = imageData;
+                }
+                console.log(`📋 Imagen ${i + 1} conservada (ruta existente): ${imageUrl}`);
+              } else if (typeof imageData === 'object' && imageData.url_imagen) {
+                // Si viene como objeto con url_imagen, usar esa ruta
+                imageUrl = imageData.url_imagen;
+                console.log(`📋 Imagen ${i + 1} conservada (objeto con ruta): ${imageUrl}`);
               }
 
+              const imageId = uuidv4();
+              console.log(`💾 [updateProduct] Guardando imagen ${i + 1} en BD:`, {
+                id: imageId,
+                productoId: id,
+                url_imagen: imageUrl,
+                orden: i,
+                es_principal: i === 0
+              });
+              
               await connection.execute(
                 'INSERT INTO imagenes_producto (id, producto_id, url_imagen, orden, es_principal) VALUES (?, ?, ?, ?, ?)',
-                [uuidv4(), id, imageUrl, i, i === 0]
+                [imageId, id, imageUrl, i, i === 0]
               );
+              
+              console.log(`✅ [updateProduct] Imagen ${i + 1} guardada en BD exitosamente`);
             }
-            console.log(`✅ ${imagenes.length} imagen(es) sincronizada(s)`);
+            console.log(`✅ [updateProduct] ${imagenes.length} imagen(es) sincronizada(s) exitosamente`);
           } else {
-            console.log(`📝 Imágenes eliminadas (array vacío)`);
+            console.log(`📝 [updateProduct] Imágenes eliminadas (array vacío)`);
           }
         } else {
-          console.log(`📝 Imágenes no modificadas (campo no enviado)`);
+          console.log(`📝 [updateProduct] Imágenes no modificadas (campo no enviado)`);
         }
 
         // 3. Sincronizar etiquetas: Actualizar como JSON
@@ -1031,53 +1053,36 @@ class ProductController {
 
       const products = await query(productQuery, [id]);
       const product = products[0];
-      const baseUrl = process.env.APP_URL || 'http://192.168.1.106:3001';
 
       // Parsear imágenes y etiquetas desde GROUP_CONCAT
+      console.log(`🔄 [updateProduct] Formateando imágenes del producto actualizado ${id}`);
       let imagenesUpdate = [];
       if (product.imagenes_raw) {
         try {
+          console.log(`📋 [updateProduct] Imágenes raw encontradas:`, product.imagenes_raw);
           const imagenesArray = JSON.parse(`[${product.imagenes_raw}]`);
-          imagenesUpdate = imagenesArray.map(img => {
-            // Validar y limpiar URL de imagen
-            let imageUrl = img.url;
-            
-            // Si no hay URL, saltar esta imagen
-            if (!imageUrl || typeof imageUrl !== 'string') {
-              console.warn('⚠️ URL de imagen inválida:', imageUrl);
-              return null;
-            }
-            
-            // Limpiar URL de espacios y caracteres especiales
-            imageUrl = imageUrl.trim();
-            
-            // Si ya es una URL completa, validarla
-            if (imageUrl.startsWith('http')) {
-              try {
-                new URL(imageUrl); // Validar URL
-                return { ...img, url: imageUrl };
-              } catch (urlError) {
-                console.warn('⚠️ URL de imagen malformada:', imageUrl);
-                return null;
-              }
-            }
-            
-            // Construir URL completa
-            const cleanPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-            const fullUrl = `${baseUrl}${cleanPath}`;
-            
-            try {
-              new URL(fullUrl); // Validar URL construida
-              return { ...img, url: fullUrl };
-            } catch (urlError) {
-              console.warn('⚠️ URL construida malformada:', fullUrl);
-              return null;
-            }
+          console.log(`📊 [updateProduct] ${imagenesArray.length} imagen(es) parseada(s) desde GROUP_CONCAT`);
+          
+          // Usar ImageHelper para formatear todas las imágenes de forma centralizada
+          imagenesUpdate = imagenesArray.map((img, idx) => {
+            console.log(`🖼️ [updateProduct] Formateando imagen ${idx + 1}/${imagenesArray.length}`);
+            // Convertir el formato del GROUP_CONCAT al formato esperado por ImageHelper
+            const imageObj = {
+              id: img.id,
+              url_imagen: img.url,
+              orden: img.orden || 0,
+              es_principal: Boolean(img.es_principal)
+            };
+            return ImageHelper.formatProductImage(imageObj);
           }).filter(img => img !== null); // Filtrar imágenes inválidas
+          
+          console.log(`✅ [updateProduct] ${imagenesUpdate.length} imagen(es) formateada(s) exitosamente`);
         } catch (error) {
-          console.warn('Error parseando imágenes:', error);
+          console.error(`❌ [updateProduct] Error parseando imágenes:`, error.message);
           imagenesUpdate = [];
         }
+      } else {
+        console.log(`📭 [updateProduct] No hay imágenes raw para formatear`);
       }
       
       let etiquetasUpdate = [];
@@ -1387,7 +1392,15 @@ class ProductController {
       const { id } = req.params;
       const files = req.files;
 
-      console.log(`📸 Subiendo imágenes para producto ${id}`);
+      console.log(`📸 [uploadProductImages] Iniciando subida de imágenes para producto ${id}`);
+      console.log(`📊 [uploadProductImages] Archivos recibidos:`, {
+        total: files?.length || 0,
+        archivos: files?.map(f => ({ 
+          originalname: f.originalname, 
+          mimetype: f.mimetype, 
+          size: f.size 
+        }))
+      });
 
       // Validar que el producto existe
       const product = await Product.findById(id);
@@ -1420,54 +1433,95 @@ class ProductController {
       // Obtener el orden actual de las imágenes del producto
       const existingImages = await product.getImages();
       const nextOrder = existingImages.length > 0 ? Math.max(...existingImages.map(img => img.orden || 0)) + 1 : 1;
+      
+      console.log(`📋 [uploadProductImages] Estado actual de imágenes:`, {
+        productoId: id,
+        imagenesExistentes: existingImages.length,
+        siguienteOrden: nextOrder
+      });
 
       // Procesar todas las imágenes en paralelo con Sharp
+      console.log(`🔄 [uploadProductImages] Procesando ${files.length} imagen(es) en paralelo`);
       const imagePromises = files.map(async (file, i) => {
         try {
           const order = nextOrder + i;
           const isPrincipal = existingImages.length === 0 && i === 0;
 
+          console.log(`🖼️ [uploadProductImages] Procesando imagen ${i + 1}/${files.length}:`, {
+            productoId: id,
+            archivo: file.originalname,
+            orden: order,
+            esPrincipal: isPrincipal,
+            rutaTemporal: file.path
+          });
+
           // Validar imagen con Sharp
+          console.log(`🔍 [uploadProductImages] Validando imagen ${i + 1}...`);
           const validation = await imageProcessor.validateImage(file.path);
           if (!validation.isValid) {
+            console.error(`❌ [uploadProductImages] Imagen ${i + 1} inválida:`, validation.error);
             throw new Error(`Imagen inválida: ${validation.error}`);
           }
+          console.log(`✅ [uploadProductImages] Imagen ${i + 1} validada correctamente`);
 
           // Crear nombre de archivo optimizado
           const ext = path.extname(file.originalname);
           const baseName = `product_${Date.now()}_${i}`;
           const optimizedFileName = `${baseName}_optimized${ext}`;
           const optimizedPath = path.join(path.dirname(file.path), optimizedFileName);
+          
+          console.log(`📝 [uploadProductImages] Generando nombre de archivo:`, {
+            original: file.originalname,
+            optimizado: optimizedFileName,
+            rutaOptimizada: optimizedPath
+          });
 
           // Optimizar imagen con Sharp
+          console.log(`⚙️ [uploadProductImages] Optimizando imagen ${i + 1}...`);
           const optimizationResult = await imageProcessor.optimizeImage(file.path, optimizedPath);
           
           if (!optimizationResult.success) {
+            console.error(`❌ [uploadProductImages] Error optimizando imagen ${i + 1}:`, optimizationResult.error);
             throw new Error(`Error optimizando imagen: ${optimizationResult.error}`);
           }
+          
+          console.log(`✅ [uploadProductImages] Imagen ${i + 1} optimizada:`, {
+            dimensiones: `${optimizationResult.metadata.width}x${optimizationResult.metadata.height}`,
+            tamaño: `${Math.round(optimizationResult.metadata.size / 1024)}KB`
+          });
 
-          // Crear URL para la imagen optimizada
-          const imageUrl = `/uploads/products/${id}/${optimizedFileName}`;
+          // Crear ruta relativa para la imagen optimizada (guardar en BD)
+          const imagePath = `/uploads/products/${id}/${optimizedFileName}`;
+          
+          console.log(`💾 [uploadProductImages] Guardando imagen ${i + 1} en BD:`, {
+            rutaRelativa: imagePath,
+            orden: order,
+            esPrincipal: isPrincipal
+          });
 
-          // Agregar imagen a la base de datos
+          // Agregar imagen a la base de datos (guardar ruta relativa)
           const imageData = {
-            urlImagen: imageUrl,
+            urlImagen: imagePath,
             orden: order,
             esPrincipal: isPrincipal
           };
 
           await product.addImage(imageData);
+          console.log(`✅ [uploadProductImages] Imagen ${i + 1} guardada en BD exitosamente`);
 
           // Eliminar archivo original (no optimizado)
           try {
             await fs.unlink(file.path);
+            console.log(`🗑️ [uploadProductImages] Archivo original ${i + 1} eliminado:`, file.path);
           } catch (unlinkError) {
-            console.warn('No se pudo eliminar archivo original:', unlinkError.message);
+            console.warn(`⚠️ [uploadProductImages] No se pudo eliminar archivo original ${i + 1}:`, unlinkError.message);
           }
 
-          console.log(`✅ Imagen ${i + 1} procesada: ${optimizationResult.metadata.width}x${optimizationResult.metadata.height}, ${Math.round(optimizationResult.metadata.size / 1024)}KB`);
+          // Construir URL completa para el frontend
+          const fullUrl = ImageHelper.buildImageUrl(imagePath);
+          console.log(`🔗 [uploadProductImages] URL completa generada para imagen ${i + 1}:`, fullUrl);
           
-          return imageUrl;
+          return fullUrl;
 
         } catch (error) {
           console.error(`Error procesando imagen ${i + 1}:`, error.message);
@@ -1476,9 +1530,13 @@ class ProductController {
       });
 
       // Esperar a que todas las imágenes se procesen
+      console.log(`⏳ [uploadProductImages] Esperando procesamiento de ${files.length} imagen(es)...`);
       const uploadedImages = await Promise.all(imagePromises);
 
-      console.log(`✅ ${uploadedImages.length} imagen(es) procesada(s) exitosamente para producto ${id}`);
+      console.log(`✅ [uploadProductImages] Proceso completado para producto ${id}:`, {
+        totalProcesadas: uploadedImages.length,
+        urls: uploadedImages
+      });
 
       res.json({
         success: true,
@@ -1501,11 +1559,16 @@ class ProductController {
       const { id, index } = req.params;
       const imageIndex = parseInt(index);
 
-      console.log(`🗑️ Eliminando imagen ${imageIndex} del producto ${id}`);
+      console.log(`🗑️ [deleteProductImage] Iniciando eliminación de imagen:`, {
+        productoId: id,
+        indice: imageIndex,
+        indiceOriginal: index
+      });
 
       // Validar que el producto existe
       const product = await Product.findById(id);
       if (!product) {
+        console.error(`❌ [deleteProductImage] Producto ${id} no encontrado`);
         return res.status(404).json({
           success: false,
           message: 'Producto no encontrado'
@@ -1513,10 +1576,26 @@ class ProductController {
       }
 
       // Obtener las imágenes del producto
+      console.log(`🔍 [deleteProductImage] Obteniendo imágenes del producto ${id}...`);
       const images = await product.getImages();
+      
+      console.log(`📊 [deleteProductImage] Imágenes encontradas:`, {
+        total: images.length,
+        imagenes: images.map((img, idx) => ({ 
+          indice: idx, 
+          id: img.id, 
+          url: img.url_imagen, 
+          orden: img.orden 
+        }))
+      });
       
       // Validar el índice
       if (imageIndex < 0 || imageIndex >= images.length) {
+        console.error(`❌ [deleteProductImage] Índice inválido:`, {
+          indice: imageIndex,
+          totalImagenes: images.length,
+          rangoValido: `0-${images.length - 1}`
+        });
         return res.status(400).json({
           success: false,
           message: 'Índice de imagen inválido'
@@ -1525,20 +1604,40 @@ class ProductController {
 
       const imageToDelete = images[imageIndex];
       
+      console.log(`🎯 [deleteProductImage] Imagen a eliminar:`, {
+        id: imageToDelete.id,
+        url_imagen: imageToDelete.url_imagen,
+        orden: imageToDelete.orden,
+        es_principal: imageToDelete.es_principal
+      });
+      
       // Eliminar el archivo físico del servidor
-      try {
-        const filePath = path.join(__dirname, '../../', imageToDelete.url_imagen);
-        await fs.unlink(filePath);
-        console.log(`🗑️ Archivo eliminado: ${filePath}`);
-      } catch (fileError) {
-        console.warn(`⚠️ No se pudo eliminar el archivo físico: ${fileError.message}`);
-        // Continuar con la eliminación de la base de datos aunque falle la eliminación del archivo
+      if (imageToDelete.url_imagen && imageToDelete.url_imagen.startsWith('/uploads/')) {
+        try {
+          const filePath = path.join(__dirname, '../../', imageToDelete.url_imagen);
+          console.log(`🗑️ [deleteProductImage] Eliminando archivo físico:`, filePath);
+          await fs.unlink(filePath);
+          console.log(`✅ [deleteProductImage] Archivo físico eliminado exitosamente`);
+        } catch (fileError) {
+          console.warn(`⚠️ [deleteProductImage] No se pudo eliminar el archivo físico:`, {
+            ruta: imageToDelete.url_imagen,
+            error: fileError.message
+          });
+          // Continuar con la eliminación de la base de datos aunque falle la eliminación del archivo
+        }
+      } else {
+        console.log(`📝 [deleteProductImage] Imagen no tiene archivo físico asociado:`, {
+          url: imageToDelete.url_imagen,
+          razon: !imageToDelete.url_imagen ? 'URL vacía' : 'No es ruta local'
+        });
       }
       
       // Eliminar la imagen de la base de datos
+      console.log(`💾 [deleteProductImage] Eliminando imagen de la BD:`, imageToDelete.id);
       await product.removeImage(imageToDelete.id);
+      console.log(`✅ [deleteProductImage] Imagen eliminada de la BD exitosamente`);
 
-      console.log(`✅ Imagen eliminada exitosamente del producto ${id}`);
+      console.log(`✅ [deleteProductImage] Proceso completado para producto ${id}`);
 
       res.json({
         success: true,
@@ -1573,7 +1672,7 @@ class ProductController {
       // Obtener las imágenes del producto
       const images = await product.getImages();
 
-      console.log(`✅ ${images.length} imagen(es) obtenida(s) para producto ${id}`);
+      console.log(`${images.length} imagen(es) obtenida(s) para producto ${id}`);
 
       res.json({
         success: true,

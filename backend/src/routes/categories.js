@@ -10,7 +10,6 @@ const {
   validateCategoryId, 
   validatePagination 
 } = require('../middleware/validation');
-const { uploadMiddleware } = require('../middleware/upload');
 
 // Obtener todas las categorías
 router.get('/', validatePagination, CategoryController.getAllCategories);
@@ -23,9 +22,6 @@ router.get('/:id/products', validateCategoryId, validatePagination, CategoryCont
 
 // Obtener estadísticas de categoría
 router.get('/:id/stats', validateCategoryId, CategoryController.getCategoryStats);
-
-// Endpoint para subir imagen de categoría
-router.post('/upload-image', authenticateToken, authorize('admin'), uploadMiddleware, CategoryController.uploadCategoryImage);
 
 // Crear categoría (solo admin)
 router.post('/', authenticateToken, authorize('admin'), validateCategory, CategoryController.createCategory);
