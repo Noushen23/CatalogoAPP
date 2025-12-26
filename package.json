@@ -11,7 +11,7 @@
     "test": "jest --watchAll",
     "lint": "expo lint",
     "toggle-api": "node ./scripts/toggle-api.js",
-    "clear-cache": "node -e \"console.log('🧹 Limpiando caché...'); require('child_process').execSync('npx expo start --clear', {stdio: 'inherit'})\"",
+    "clear-cache": "node -e \"console.log(' Limpiando caché...'); require('child_process').execSync('npx expo start --clear', {stdio: 'inherit'})\"",
     "reset": "rm -rf node_modules/.cache .expo && npm start",
     "build:android": "eas build --platform android",
     "build:android:apk": "eas build --platform android --profile preview",

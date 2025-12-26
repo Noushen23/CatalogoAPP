@@ -2,14 +2,14 @@
 export const CONFIG = {
   // API Configuration
   API: {
-    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.106:3001/api/v1',
+    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://192.168.3.104:3001/api/v1',
     TIMEOUT: 15000,
     MAX_RETRIES: 2,
   },
   
   // Apimaterial Configuration
   APIMATERIAL: {
-    BASE_URL: process.env.NEXT_PUBLIC_APIMATERIAL_URL || 'http://localhost:51250',
+    BASE_URL: process.env.NEXT_PUBLIC_APIMATERIAL_URL || 'http://192.168.3.104:51250',
     TOKEN: process.env.NEXT_PUBLIC_APIMATERIAL_TOKEN || 'angeldavidcapa2025',
     TIMEOUT: 10000,
   },

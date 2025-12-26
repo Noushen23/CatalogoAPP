@@ -1,45 +1,47 @@
 {
   "expo": {
-    "name": "products-app",
-    "slug": "products-app",
+    "name": "Tienda Bomberos",
+    "slug": "tienda-bomberos",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "products-app",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/images/elLogo-1.png",
+    "scheme": "tienda-bomberos",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/elLogo-1.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.productapp",
+      "bundleIdentifier": "com.tiendabomberos.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.tiendabomberos.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/elLogo-1.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.productapp",
-      "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.RECORD_AUDIO",
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK",
-	"android.permission.INTERNET",
+        "android.permission.INTERNET",
         "com.google.android.c2dm.permission.RECEIVE"
       ],
-	"usesCleartextTraffic": true
+      "usesCleartextTraffic": true
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/elLogo-1.png"
     },
     "plugins": [
       "expo-router",
@@ -48,7 +50,7 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Esta app necesita acceso a la ubicación para encontrar direcciones cercanas."
         }
-        ],
+      ],
       [
         "expo-build-properties",
         {
@@ -58,16 +60,16 @@
               "cleartextTrafficPermitted": true,
               "domainConfig": [
                 {
-                  "domains": ["181.49.225.64"],
+                  "domains": [
+                    "181.49.225.64"
+                  ],
                   "cleartextTrafficPermitted": true
                 }
               ]
             }
           }
         }
-
-	]
-
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -76,12 +78,12 @@
       "router": {
         "origin": false
       },
-      "eas": {
-        "projectId": "a40e4d9a-96ff-4ef3-94fc-8c4d2e547dfb"
-      },
       "EXPO_PUBLIC_API_URL": "http://181.49.225.64:3001/api/v1",
       "EXPO_PUBLIC_API_BASE_URL": "http://181.49.225.64:3001",
-      "EXPO_PUBLIC_STAGE": "production"
+      "EXPO_PUBLIC_STAGE": "production",
+      "eas": {
+        "projectId": "bda43edf-60e4-4418-875a-0e057ac9c3a3"
+      }
     },
     "owner": "angeldacid"
   }

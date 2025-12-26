@@ -39,8 +39,8 @@ const config = {
       
       const allowedOrigins = [
         'http://localhost:3000', 
-        'http://localhost:8081', // Expo web
-        'http://localhost:8082', // Expo web alternativo
+        'http://192.168.1.106:8081', // Expo web
+        'http://192.168.1.106:8082', // Expo web alternativo
         'http://192.168.3.104:3000', // Admin web específico
         'http://192.168.3.104:3001', // Android emulator
         'http://192.168.1.106:3000', // Admin web IP pública
@@ -142,7 +142,7 @@ const config = {
 
   // Configuración de la API de Terceros
   terceroApi: {
-    url: process.env.TERCERO_API_URL || 'http://localhost:51255',
+    url: process.env.TERCERO_API_URL || 'http://181.49.225.64:51255',
     token: process.env.TERCERO_API_TOKEN || 'angeldavidcapa2025'
   },
 

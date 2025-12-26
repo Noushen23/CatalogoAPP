@@ -115,7 +115,7 @@ const RegisterScreen = () => {
           <ThemedControlledInput
             control={control}
             name="telefono"
-            placeholder="Teléfono (opcional)"
+            placeholder="Teléfono"
             keyboardType="phone-pad"
             icon="call-outline"
           />

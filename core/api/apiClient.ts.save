@@ -106,20 +106,13 @@ class ApiClient {
         if (error.response?.status === 401) {
           const errorUrl = error.config?.url || '';
           const isAuthEndpoint = errorUrl.includes('/auth/login') || errorUrl.includes('/auth/register');
-          
-          // Si es un endpoint de autenticación (login/register), usar el mensaje del backend
-          if (isAuthEndpoint) {
-            const backendMessage = error.response?.data?.message || 'Credenciales inválidas';
-            // Convertir mensaje genérico del backend a mensaje más específico
-            if (backendMessage === 'Credenciales inválidas') {
-              return Promise.reject(new Error('Contraseña o email incorrecto'));
-            }
-            return Promise.reject(new Error(backendMessage));
-          }
-          
-          // Para otros endpoints, es un problema de token
-          await this.clearToken();
-          return Promise.reject(new Error('Token inválido o expirado'));
+	  
+	  // si es un endpoint de autentication (login/register), usar el mensaje del backend
+
+	  if (isAuthEndpoint) {
+		const backendMessage = error.response?.data?.message || 'Credenciales inválidas';
+		//CONVERTIR MENSAJE GENEIRCO DEL BACKEND A MENSAJE MAS ESPECIFICO
+		if (backendMessage === 'Credenciales inválidas')}
         }
         return Promise.reject(error);
       }
@@ -248,11 +241,6 @@ class ApiClient {
 
   // Manejar errores de la API
   private handleError(error: any): Error {
-    // Si el error ya es una instancia de Error (formateado por el interceptor), retornarlo directamente
-    if (error instanceof Error && error.message) {
-      return error;
-    }
-    
     if (error.response) {
       // Error de respuesta del servidor
       const { status, data } = error.response;

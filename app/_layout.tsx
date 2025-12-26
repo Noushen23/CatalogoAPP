@@ -33,7 +33,8 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  // Forzar modo claro siempre
+  const colorScheme: 'light' = 'light';
   const backgroundColor = useThemeColor({}, 'background');
 
   // Estado de autenticación
@@ -86,7 +87,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor }}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <ThemeProvider value={DefaultTheme}>
           <Stack
             screenOptions={{ 
               headerShown: false,

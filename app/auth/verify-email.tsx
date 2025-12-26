@@ -8,6 +8,8 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -65,7 +67,9 @@ export default function VerifyEmailScreen() {
       
       // Mover al input anterior
       if (index > 0) {
-        inputRefs.current[index - 1]?.focus();
+        setTimeout(() => {
+          inputRefs.current[index - 1]?.focus();
+        }, 50);
       }
     } else if (numericText.length === 1) {
       // Ingresar un dígito
@@ -75,10 +79,15 @@ export default function VerifyEmailScreen() {
       
       // Mover al siguiente input
       if (index < CODE_LENGTH - 1) {
-        inputRefs.current[index + 1]?.focus();
+        setTimeout(() => {
+          inputRefs.current[index + 1]?.focus();
+        }, 50);
       } else {
-        // Último input, quitar foco
-        inputRefs.current[index]?.blur();
+        // Último input, quitar foco y cerrar teclado
+        setTimeout(() => {
+          inputRefs.current[index]?.blur();
+          Keyboard.dismiss();
+        }, 100);
       }
     } else if (numericText.length > 1) {
       // Pegar código completo
@@ -95,14 +104,23 @@ export default function VerifyEmailScreen() {
       
       // Mover al último input con contenido
       const lastIndex = Math.min(index + digits.length - 1, CODE_LENGTH - 1);
-      inputRefs.current[lastIndex]?.focus();
+      setTimeout(() => {
+        inputRefs.current[lastIndex]?.focus();
+        if (lastIndex === CODE_LENGTH - 1) {
+          setTimeout(() => {
+            Keyboard.dismiss();
+          }, 200);
+        }
+      }, 50);
     }
   };
 
   // Manejar tecla backspace
   const handleKeyPress = (e: any, index: number) => {
     if (e.nativeEvent.key === 'Backspace' && code[index] === '' && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+      setTimeout(() => {
+        inputRefs.current[index - 1]?.focus();
+      }, 50);
     }
   };
 
@@ -136,11 +154,15 @@ export default function VerifyEmailScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
@@ -185,10 +207,20 @@ export default function VerifyEmailScreen() {
                 onChangeText={(text) => handleChangeText(text, index)}
                 onKeyPress={(e) => handleKeyPress(e, index)}
                 onFocus={() => setFocusedIndex(index)}
+                onBlur={() => {
+                  // Solo actualizar si no hay otro input enfocado
+                  setTimeout(() => {
+                    if (!inputRefs.current.some(ref => ref?.isFocused())) {
+                      setFocusedIndex(-1);
+                    }
+                  }, 100);
+                }}
                 keyboardType="number-pad"
                 maxLength={1}
-                selectTextOnFocus
                 editable={!isLoading}
+                returnKeyType={index === CODE_LENGTH - 1 ? 'done' : 'next'}
+                blurOnSubmit={index === CODE_LENGTH - 1}
+                contextMenuHidden={true}
               />
             ))}
           </View>
@@ -259,7 +291,8 @@ export default function VerifyEmailScreen() {
               Verificar más tarde
             </ThemedText>
           </TouchableOpacity>
-        </ScrollView>
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </ThemedView>
   );
