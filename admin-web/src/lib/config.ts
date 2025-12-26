@@ -1,13 +1,16 @@
 // Configuración centralizada del admin-web
 export const CONFIG = {
   // API Configuration
+  // 192.168.3.6: Servidor local (API principal)
+  // 181.49.225.64: IP pública (producción)
   API: {
-    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://192.168.3.104:3001/api/v1',
+    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://192.168.3.6:3001/api/v1',
     TIMEOUT: 15000,
     MAX_RETRIES: 2,
   },
   
   // Apimaterial Configuration
+  // 192.168.3.104: Base de datos TNS (Apimaterial)
   APIMATERIAL: {
     BASE_URL: process.env.NEXT_PUBLIC_APIMATERIAL_URL || 'http://192.168.3.104:51250',
     TOKEN: process.env.NEXT_PUBLIC_APIMATERIAL_TOKEN || 'angeldavidcapa2025',

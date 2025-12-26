@@ -1,6 +1,8 @@
 import axios, { AxiosError, AxiosResponse } from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.106:3001/api'
+// 192.168.3.6: Servidor local (API principal)
+// 181.49.225.64: IP pública (producción)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.3.6:3001/api'
 
 export const apiClient = axios.create({
   baseURL: API_URL,

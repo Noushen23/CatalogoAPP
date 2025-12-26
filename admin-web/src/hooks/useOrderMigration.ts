@@ -27,7 +27,8 @@ export interface MigrationResponse {
 
 // Servicio para migración de pedidos
 class OrderMigrationService {
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  // 192.168.3.6: Servidor local (API principal)
+  private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.3.6:3001';
 
   async getMigrationDetails(orderId: string): Promise<MigrationResponse> {
     const response = await fetch(`${this.baseUrl}/api/orders/${orderId}/detail`);

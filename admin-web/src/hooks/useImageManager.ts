@@ -35,7 +35,8 @@ export function useImageManager({
       const response = await AdminProductsService.uploadProductImages(productId, files)
       
       // Construir URLs completas
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.106:3001'
+      // 192.168.3.6: Servidor local (API principal)
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.3.6:3001'
       const newImages: ProductImage[] = (response.data || []).map((url: string, index: number) => ({
         id: `upload-${Date.now()}-${index}`,
         url: url.startsWith('http') ? url : `${baseUrl}${url}`,

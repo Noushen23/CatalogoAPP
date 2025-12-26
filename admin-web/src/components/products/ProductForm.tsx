@@ -109,7 +109,8 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         // Actualizar el estado con las nuevas URLs de imagen
         const newImageUrls = response.data || []
         // Construir URLs completas para las nuevas imágenes
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.106:3001'
+        // 192.168.3.6: Servidor local (API principal)
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.3.6:3001'
         const fullImageUrls = newImageUrls.map((url: string) => 
           url.startsWith('http') ? url : `${baseUrl}${url}`
         )
