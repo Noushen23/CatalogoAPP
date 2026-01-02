@@ -38,13 +38,10 @@ const config = {
       }
       
       const allowedOrigins = [
-        'http://localhost:3000', 
-        'http://192.168.1.106:8081', // Expo web
-        'http://192.168.1.106:8082', // Expo web alternativo
+        'http://192.168.3.104:8081', // Expo web
+        'http://192.168.3.104:8082', // Expo web alternativo
         'http://192.168.3.104:3000', // Admin web específico
         'http://192.168.3.104:3001', // Android emulator
-        'http://192.168.1.106:3000', // Admin web IP pública
-        'http://192.168.1.106:3001', // API IP pública
         'http://181.49.225.64:3000', // Admin web servidor remoto
         'http://181.49.225.64:3001', // API servidor remoto
       ];
@@ -54,7 +51,6 @@ const config = {
         /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // Cualquier IP local 192.168.x.x con cualquier puerto
         /^http:\/\/181\.49\.225\.\d+:\d+$/, // IP del servidor remoto con cualquier puerto
         /^http:\/\/10\.0\.2\.\d+:\d+$/, // Android emulator
-        /^http:\/\/localhost:\d+$/, // Cualquier puerto localhost
         /^http:\/\/127\.0\.0\.1:\d+$/ // Cualquier puerto 127.0.0.1
       ];
       
@@ -115,7 +111,7 @@ const config = {
   // FORZAR IP pública para que las imágenes sean accesibles desde cualquier lugar
   apiBaseUrl: (() => {
     // IP pública del servidor (siempre usar esta para imágenes)
-    const IP_PUBLICA = '181.49.225.64';
+    const IP_PUBLICA = '192.168.3.6';
     const PUERTO = process.env.PORT || 3001;
     const apiBaseUrl = `http://${IP_PUBLICA}:${PUERTO}`;
     

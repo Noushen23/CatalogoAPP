@@ -7,7 +7,7 @@ module.exports = {
     // Configuración del servidor
     server: {
         port: process.env.PORT || 51250,
-        host: process.env.HOST || '192.168.3.104',
+        host: process.env.HOST || '192.168.3.6',
         environment: process.env.NODE_ENV || 'development'
     },
 
@@ -16,7 +16,7 @@ module.exports = {
         firebird: {
             host: process.env.FIREBIRD_HOST || '192.168.3.104',
             port: process.env.FIREBIRD_PORT || 3050,
-            database: process.env.FIREBIRD_DATABASE || '192.168.3.104:C:/Datos_TNS/PRUEBA.GDB',
+            database: process.env.FIREBIRD_DATABASE || 'C:/Datos_TNS/PRUEBA.GDB',
             user: process.env.FIREBIRD_USER || 'SYSDBA',
             password: process.env.FIREBIRD_PASSWORD || 'masterkey',
             lowercase_keys: false,
@@ -60,14 +60,6 @@ module.exports = {
         }
     },
 
-    // Configuración de la aplicación
-    app: {
-        name: 'Plataforma Web de Pedidos de Venta - TNS',
-        version: '2.0.0',
-        description: 'Sistema optimizado para gestión de pedidos de venta',
-        author: 'Sistema TNS',
-        contact: 'soporte@tns.com'
-    },
 
     // Configuración de logs
     logging: {

@@ -8,12 +8,12 @@ export const API_CONFIG = {
 
   // URL base de la API - lee desde variables de entorno
   get API_URL(): string {
-    return Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL || 'http://181.49.225.64:3001/api/v1';
+    return Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL || 'http://192.168.3.6:3001/api/v1';
   },
 
   // URL base sin /api/v1
   get API_BASE_URL(): string {
-    return Constants.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL || 'http://181.49.225.64:3001';
+    return Constants.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.3.6:3001';
   },
 
   // URL sugerida para dispositivos físicos Android

@@ -6,7 +6,7 @@
 const express = require('express');
 const cors = require('cors');
 const { executeQuery } = require('./config/database');
-
+const config = require('./config/app.config');
 const app = express();
 
 // Configuración básica
@@ -315,8 +315,9 @@ app.use((req, res) => {
 });
 
 // Iniciar servidor
-const PORT = process.env.PORT || 51250;
-const HOST = process.env.HOST || 'localhost';
+
+const PORT = config.server.port;
+const HOST = config.server.host;
 
 app.listen(PORT, HOST, () => {
     console.log(`

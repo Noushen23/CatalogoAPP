@@ -1,11 +1,4 @@
-/**
- * Configuración centralizada del admin-web
- * 
- * IPs del sistema:
- * - 192.168.3.104: Base de datos TNS (Apimaterial)
- * - 192.168.3.6: Servidor local (API principal)
- * - 181.49.225.64: IP pública (producción)
- */
+
 
 // ============================================
 // Configuración de Servidores
@@ -20,7 +13,7 @@ const SERVER_CONFIG = {
   },
   // Base de datos TNS (Apimaterial)
   TNS: {
-    HOST: '192.168.3.104',
+    HOST: '192.168.3.6',
     PORT: 51250,
   },
   // IP pública (producción)

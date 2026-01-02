@@ -191,7 +191,7 @@ class ProductController {
         throw new Error(`products no es un array: ${typeof products}`);
       }
 
-      const baseUrl = process.env.APP_URL || 'http://181.49.225.64:3001';
+      const baseUrl = process.env.APP_URL || 'http://192.168.3.6:3001';
       
       // Obtener imágenes para todos los productos de forma separada (más confiable)
       const formattedProducts = await Promise.all(products.map(async (product) => {
@@ -304,7 +304,7 @@ class ProductController {
           fechaCreacion: product.fecha_creacion,
           fechaActualizacion: product.fecha_actualizacion
         };
-      });
+      }));
 
       // Contar total de productos con los mismos filtros
       let countQuery = 'SELECT COUNT(*) as total FROM productos p WHERE ' + whereClause;
@@ -367,7 +367,7 @@ class ProductController {
       
       // Obtener imágenes del producto de forma separada (más confiable)
       const config = require('../config/env');
-      const baseUrl = config.apiBaseUrl || process.env.APP_URL || 'http://192.168.1.106:3001';
+      const baseUrl = config.apiBaseUrl || process.env.APP_URL || 'http://192.168.3.104:3001';
       let imagenes = [];
       try {
         const imagesQuery = `
@@ -716,7 +716,7 @@ class ProductController {
 
       const products = await query(productQuery, [productId]);
       const product = products[0];
-      const baseUrl = process.env.APP_URL || 'http://192.168.1.106:3001';
+      const baseUrl = process.env.APP_URL || 'http://192.168.3.104:3001';
 
       // Parsear imágenes y etiquetas desde GROUP_CONCAT
       let imagenesFormateadas = [];
@@ -1043,7 +1043,7 @@ class ProductController {
 
       const products = await query(productQuery, [id]);
       const product = products[0];
-      const baseUrl = process.env.APP_URL || 'http://192.168.1.106:3001';
+      const baseUrl = process.env.APP_URL || 'http://192.168.3.104:3001';
 
       // Parsear imágenes y etiquetas desde GROUP_CONCAT
       let imagenesUpdate = [];
