@@ -200,6 +200,14 @@ class OrderController {
         });
       }
 
+
+	if (order.referenciaPago){
+		 return res.status(400).json({
+			success: false,
+			message: 'No se puede cancelar un pedido que ya ha sido pagado.'
+			});
+		}
+
       // Verificar que el pedido esté en estado 'pendiente' antes de intentar cancelar
       if (order.estado !== 'pendiente') {
         return res.status(400).json({

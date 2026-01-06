@@ -5,6 +5,22 @@ import { getMigrationApiUrl } from './config'
 // Usar configuración centralizada
 const MIGRATION_API_URL = getMigrationApiUrl()
 
+
+
+
+
+// Log de la URL en desarrollo para verificación
+if (process.env.NODE_ENV === 'development') {
+  console.log('🔗 Migration API Client inicializado con URL:', MIGRATION_API_URL)
+}
+
+
+
+
+
+
+
+
 export const migrationApiClient = axios.create({
   baseURL: MIGRATION_API_URL,
   timeout: 30000, // 30 segundos para operaciones de migración
@@ -15,19 +31,9 @@ export const migrationApiClient = axios.create({
   validateStatus: (status) => status < 500,
 })
 
-// Interceptor de request para agregar token de auth (si es necesario)
-migrationApiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('admin_token')
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
 
 // Interceptor de response para manejo de errores específicos de migración
+
 migrationApiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {

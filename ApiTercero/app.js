@@ -84,9 +84,15 @@ app.use((req, res) => {
 // Middleware de manejo de errores (debe ir al final)
 app.use(errorHandler);
 
+
+// Importar configuración
+const config = require('./config/app.config');
+
 // Iniciar servidor
-const PORT = process.env.PORT || 51255;
-const HOST = process.env.HOST || 'localhost';
+const PORT = process.env.PORT || config.server.port;
+const HOST = process.env.HOST || config.server.host;
+
+
 
 app.listen(PORT, HOST, () => {
     console.log(`

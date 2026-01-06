@@ -25,69 +25,28 @@ export interface MigrationResponse {
   message?: string;
 }
 
-import { getApiBaseUrl } from '@/lib/config'
+import { migrationApiClient } from '@/lib/migration-api-client'
 
 // Servicio para migración de pedidos
 class OrderMigrationService {
-  private baseUrl = getApiBaseUrl();
-
   async getMigrationDetails(orderId: string): Promise<MigrationResponse> {
-    const response = await fetch(`${this.baseUrl}/api/orders/${orderId}/detail`);
-    if (!response.ok) {
-      throw new Error('Error al obtener detalles de migración');
-    }
-    return response.json();
+    const response = await migrationApiClient.get(`/orders/${orderId}/detail`);
+    return response.data;
   }
 
   async migrateOrder(orderId: string, options: MigrationOptions): Promise<MigrationResponse> {
-    const response = await fetch(`${this.baseUrl}/api/orders/${orderId}/migrate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(options),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Error al migrar pedido');
-    }
-    
-    return response.json();
+    const response = await migrationApiClient.post(`/orders/${orderId}/migrate`, options);
+    return response.data;
   }
 
   async iniciarPreparacion(orderId: string, options: MigrationOptions): Promise<MigrationResponse> {
-    const response = await fetch(`${this.baseUrl}/api/orders/${orderId}/iniciar-preparacion`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(options),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Error al iniciar preparación');
-    }
-    
-    return response.json();
+    const response = await migrationApiClient.post(`/orders/${orderId}/iniciar-preparacion`, options);
+    return response.data;
   }
 
   async retryMigration(orderId: string, options: MigrationOptions): Promise<MigrationResponse> {
-    const response = await fetch(`${this.baseUrl}/api/orders/${orderId}/retry-migration`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(options),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Error al reintentar migración');
-    }
-    
-    return response.json();
+    const response = await migrationApiClient.put(`/orders/${orderId}/retry-migration`, options);
+    return response.data;
   }
 }
 

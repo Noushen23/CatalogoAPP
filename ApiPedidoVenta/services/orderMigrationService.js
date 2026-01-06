@@ -14,22 +14,55 @@ function round2(value) {
     return Math.round(num * 100) / 100;
 }
 
-// Configuración de la base de datos móvil
+// Configuración de la base de datos móvi
+
+
+
+
+
 const mobileDbConfig = {
-    host: process.env.MOBILE_DB_HOST || 'localhost',
-    port: process.env.MOBILE_DB_PORT || 3306,
-    user: process.env.MOBILE_DB_USER || 'root',
-    password: process.env.MOBILE_DB_PASSWORD || '',
-    database: process.env.MOBILE_DB_NAME || 'tiendamovil',
-    charset: 'utf8mb4'
+    host: process.env.MOBILE_DB_HOST || process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.MOBILE_DB_PORT || process.env.DB_PORT || '3306', 10),
+    user: process.env.MOBILE_DB_USER || process.env.DB_USER || 'desarrollador',
+    password: process.env.MOBILE_DB_PASSWORD || process.env.DB_PASSWORD || 'Bomberos2025#',
+    database: process.env.MOBILE_DB_NAME || process.env.DB_NAME || 'tiendamovil',
+    charset: 'utf8mb4',
+    timezone: 'Z',
+    acquireTimeout: 60000,
+    timeout: 60000
 };
 
 /**
  * Crear conexión a la base de datos móvil
  */
 async function createMobileConnection() {
-    return await mysql.createConnection(mobileDbConfig);
+    try {
+        const connection = await mysql.createConnection(mobileDbConfig);
+        return connection;
+    } catch (error) {
+        console.error('❌ Error creando conexión a base de datos móvil:', error.message);
+        console.error('❌ Configuración intentada:', {
+            host: mobileDbConfig.host,
+            port: mobileDbConfig.port,
+            database: mobileDbConfig.database,
+            user: mobileDbConfig.user
+        });
+        console.error('💡 Sugerencia: Si MySQL está en el mismo servidor, usa "localhost" en lugar de la IP');
+        throw error;
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  * Ejecutar consulta en la base de datos móvil

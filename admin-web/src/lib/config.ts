@@ -14,7 +14,7 @@ const SERVER_CONFIG = {
   // Base de datos TNS (Apimaterial)
   TNS: {
     HOST: '192.168.3.6',
-    PORT: 51250,
+    PORT: 51255,
   },
   // IP pública (producción)
   PUBLIC: {
@@ -51,11 +51,25 @@ export const CONFIG = {
     TIMEOUT: 10000,
   },
   
+
   // Migration API Configuration
-  // Nota: La migración puede usar el servidor local o TNS dependiendo de la implementación
+  // IMPORTANTE: ApiPedidoVenta corre en el puerto 51250, NO en 3001
+  // URL: http://192.168.3.6:51250/api
   MIGRATION: {
-    BASE_URL: process.env.NEXT_PUBLIC_MIGRATION_API_URL || buildUrl(SERVER_CONFIG.TNS.HOST, SERVER_CONFIG.TNS.PORT, '/api'),
+    // Forzar URL correcta - ApiPedidoVenta en puerto 51250
+    BASE_URL: process.env.NEXT_PUBLIC_MIGRATION_API_URL || `http://${SERVER_CONFIG.TNS.HOST}:${SERVER_CONFIG.TNS.PORT}/api`,
     TIMEOUT: 30000,
+  },
+
+
+
+
+
+// Nota: ApiTercero corre en el puerto 51255 para gestión de terceros/clientes
+  TERCERO: {
+    BASE_URL: process.env.NEXT_PUBLIC_TERCERO_API_URL || buildUrl(SERVER_CONFIG.LOCAL.HOST, 51255, '/api'),
+    TOKEN: process.env.NEXT_PUBLIC_TERCERO_API_TOKEN || 'angeldavidcapa2025',
+    TIMEOUT: 10000,
   },
   
   // Image Upload Configuration
@@ -154,11 +168,39 @@ export const getApimaterialUrl = (): string => {
   return CONFIG.APIMATERIAL.BASE_URL
 }
 
+
+
+
+
 /**
  * Obtiene la URL de Migration API
+ * IMPORTANTE: ApiPedidoVenta corre en puerto 51250, NO en 3001
  */
 export const getMigrationApiUrl = (): string => {
-  return CONFIG.MIGRATION.BASE_URL
+  const url = CONFIG.MIGRATION.BASE_URL
+  
+  // Validación: asegurar que no esté usando el puerto incorrecto
+  if (url.includes(':3001')) {
+    console.warn('⚠️ ADVERTENCIA: URL de migración apunta al puerto 3001 (incorrecto). Debe ser 51250')
+    // Forzar URL correcta
+    return `http://${SERVER_CONFIG.TNS.HOST}:${SERVER_CONFIG.TNS.PORT}/api`
+  }
+  
+  // Log en desarrollo para verificar URL
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔗 Migration API URL:', url)
+  }
+  
+  return url
+}
+
+
+
+/**
+ * Obtiene la URL de ApiTercero
+ */
+export const getTerceroApiUrl = (): string => {
+  return CONFIG.TERCERO.BASE_URL
 }
 
 // Tipos derivados de la configuración

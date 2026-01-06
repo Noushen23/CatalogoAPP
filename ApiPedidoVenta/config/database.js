@@ -6,20 +6,19 @@
 const Firebird = require('node-firebird');
 const config = require('./app.config');
 
-// Pool de conexiones para mejor rendimiento
+// Pool de conexiones (máx 5 conexiones simultáneas)
 const pool = Firebird.pool(5, config.database.firebird);
 
 /**
- * Crear una nueva conexión
- * @returns {Promise<Object>} Conexión a la base de datos
+ * Obtener una conexión desde el pool
+ * ⚠️ IMPORTANTE: siempre llamar db.detach()
  */
-async function createConnection() {
+function createConnection() {
     return new Promise((resolve, reject) => {
         pool.get((err, db) => {
             if (err) {
-                console.error('Error obteniendo conexión:', err);
-                reject(err);
-                return;
+                console.error('❌ Error obteniendo conexión:', err);
+                return reject(err);
             }
             resolve(db);
         });
@@ -27,185 +26,174 @@ async function createConnection() {
 }
 
 /**
- * Ejecutar consulta simple
- * @param {string} query - Consulta SQL
- * @param {Array} params - Parámetros de la consulta
- * @returns {Promise<Array>} Resultados de la consulta
+ * Ejecutar una consulta SQL simple
+ * @param {string} query
+ * @param {Array} params
+ * @returns {Promise<Array>}
  */
-async function executeQuery(query, params = []) {
+function executeQuery(query, params = []) {
     return new Promise((resolve, reject) => {
         pool.get((err, db) => {
             if (err) {
-                console.error('Error obteniendo conexión:', err);
-                reject(err);
-                return;
+                console.error('❌ Error obteniendo conexión:', err);
+                return reject(err);
             }
 
-            db.query(query, params, (err, results) => {
-                db.detach();
-                
+            db.query(query, params, (err, result) => {
+                db.detach(); // 🔐 liberar conexión SIEMPRE
+
                 if (err) {
-                    console.error('Error ejecutando consulta:', err);
-                    reject(err);
-                    return;
+                    console.error('❌ Error ejecutando consulta:', err);
+                    return reject(err);
                 }
-                
-                resolve(results);
+
+                resolve(result);
             });
         });
     });
 }
 
 /**
- * Ejecutar consulta simple (versión original para compatibilidad)
- * @param {string} query - Consulta SQL
- * @param {Array} params - Parámetros de la consulta
- * @returns {Promise<Array>} Resultados de la consulta
+ * Alias para compatibilidad con código anterior
  */
-async function ejecutarConsulta(query, params = []) {
+function ejecutarConsulta(query, params = []) {
     return executeQuery(query, params);
 }
 
 /**
- * Ejecutar transacción con callback
- * @param {Object} connection - Conexión a la base de datos
- * @param {Function} callback - Función con la transacción
- * @returns {Promise<any>} Resultado de la transacción
+ * Ejecutar una transacción recibiendo la conexión
+ * @param {Object} db
+ * @param {Function} callback
  */
-async function executeTransactionWithCallback(connection, callback) {
+function executeTransactionWithCallback(db, callback) {
     return new Promise((resolve, reject) => {
-        connection.transaction(Firebird.ISOLATION_READ_COMMITTED, async (err, transaction) => {
-            if (err) {
-                console.error('Error iniciando transacción:', err);
-                reject(err);
-                return;
-            }
-
-            try {
-                const resultado = await callback(transaction);
-                transaction.commit((err) => {
-                    if (err) {
-                        console.error('Error haciendo commit:', err);
-                        transaction.rollback();
-                        reject(err);
-                    } else {
-                        resolve(resultado);
-                    }
-                });
-            } catch (error) {
-                console.error('Error en transacción:', error);
-                transaction.rollback();
-                reject(error);
-            }
-        });
-    });
-}
-
-/**
- * Ejecutar transacción (versión original para compatibilidad)
- * @param {Function} callback - Función con la transacción
- * @returns {Promise<any>} Resultado de la transacción
- */
-async function ejecutarTransaccion(callback) {
-    return new Promise((resolve, reject) => {
-        pool.get((err, db) => {
-            if (err) {
-                console.error('Error obteniendo conexión:', err);
-                reject(err);
-                return;
-            }
-
-            db.transaction(Firebird.ISOLATION_READ_COMMITTED, async (err, transaction) => {
+        db.transaction(
+            Firebird.ISOLATION_READ_COMMITTED,
+            async (err, transaction) => {
                 if (err) {
-                    console.error('Error iniciando transacción:', err);
-                    db.detach();
-                    reject(err);
-                    return;
+                    console.error('❌ Error iniciando transacción:', err);
+                    return reject(err);
                 }
 
                 try {
-                    const resultado = await callback(transaction);
-                    transaction.commit((err) => {
+                    const result = await callback(transaction);
+
+                    transaction.commit(err => {
                         if (err) {
-                            console.error('Error haciendo commit:', err);
                             transaction.rollback();
-                            reject(err);
-                        } else {
-                            resolve(resultado);
+                            return reject(err);
                         }
-                        db.detach();
+                        resolve(result);
                     });
                 } catch (error) {
-                    console.error('Error en transacción:', error);
                     transaction.rollback();
-                    db.detach();
                     reject(error);
                 }
-            });
+            }
+        );
+    });
+}
+
+/**
+ * Ejecutar transacción completa desde el pool
+ * @param {Function} callback
+ */
+function ejecutarTransaccion(callback) {
+    return new Promise((resolve, reject) => {
+        pool.get((err, db) => {
+            if (err) {
+                console.error('❌ Error obteniendo conexión:', err);
+                return reject(err);
+            }
+
+            db.transaction(
+                Firebird.ISOLATION_READ_COMMITTED,
+                async (err, transaction) => {
+                    if (err) {
+                        db.detach();
+                        return reject(err);
+                    }
+
+                    try {
+                        const result = await callback(transaction);
+
+                        transaction.commit(err => {
+                            if (err) {
+                                transaction.rollback();
+                                db.detach();
+                                return reject(err);
+                            }
+
+                            db.detach();
+                            resolve(result);
+                        });
+                    } catch (error) {
+                        transaction.rollback();
+                        db.detach();
+                        reject(error);
+                    }
+                }
+            );
         });
     });
 }
 
 /**
- * Obtener información del sistema TNS
- * @returns {Promise<Object>} Información del sistema
+ * Obtener información general del sistema TNS
  */
 async function obtenerInfoSistema() {
+    const info = {};
+
     try {
-        const info = {};
-        
-        // Información de TERCEROS
         const terceros = await executeQuery(`
-            SELECT COUNT(*) as total, 
-                   COUNT(CASE WHEN CLIENTE = 'S' THEN 1 END) as clientes,
-                   COUNT(CASE WHEN VENDED = 'S' THEN 1 END) as vendedores
+            SELECT
+                COUNT(*) AS total,
+                COUNT(CASE WHEN CLIENTE = 'S' THEN 1 END) AS clientes,
+                COUNT(CASE WHEN VENDED = 'S' THEN 1 END) AS vendedores
             FROM TERCEROS
         `);
         info.terceros = terceros[0];
-        
-        // Información de MATERIAL
+
         const material = await executeQuery(`
-            SELECT COUNT(*) as total
+            SELECT COUNT(*) AS total
             FROM MATERIAL
         `);
         info.material = material[0];
-        
-        // Información de BODEGA
+
         const bodega = await executeQuery(`
-            SELECT COUNT(*) as total
+            SELECT COUNT(*) AS total
             FROM BODEGA
         `);
         info.bodega = bodega[0];
-        
-        // Información de KARDEX (pedidos)
+
         const kardex = await executeQuery(`
-            SELECT COUNT(*) as total,
-                   COUNT(CASE WHEN FECANULADO IS NULL THEN 1 END) as activos,
-                   COUNT(CASE WHEN FECANULADO IS NOT NULL THEN 1 END) as anulados
+            SELECT
+                COUNT(*) AS total,
+                COUNT(CASE WHEN FECANULADO IS NULL THEN 1 END) AS activos,
+                COUNT(CASE WHEN FECANULADO IS NOT NULL THEN 1 END) AS anulados
             FROM KARDEX
         `);
         info.kardex = kardex[0];
-        
-        // Información de DEKARDEX (líneas de pedidos)
+
         const dekardex = await executeQuery(`
-            SELECT COUNT(*) as total
+            SELECT COUNT(*) AS total
             FROM DEKARDEX
         `);
         info.dekardex = dekardex[0];
-        
+
         return info;
     } catch (error) {
-        console.error('Error obteniendo información del sistema:', error);
+        console.error('❌ Error obteniendo información del sistema:', error);
         throw error;
     }
 }
 
 module.exports = {
+    pool,
     createConnection,
     executeQuery,
-    executeTransactionWithCallback,
     ejecutarConsulta,
+    executeTransactionWithCallback,
     ejecutarTransaccion,
-    obtenerInfoSistema,
-    pool
+    obtenerInfoSistema
 };

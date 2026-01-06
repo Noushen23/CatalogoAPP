@@ -379,16 +379,24 @@ class Order {
 
   // Cancelar pedido
   async cancel(reason = null) {
-    // Solo se puede cancelar si el pedido está en estado 'pendiente'
-    if (this.estado !== 'pendiente') {
+		// Verificar si el pedido ya esta cancelado
+
       if (this.estado === 'cancelada') {
         throw new Error('El pedido ya está cancelado');
       }
-      
+
+      //Verififcar si el peido ya fue entregado 
       if (this.estado === 'entregada') {
         throw new Error('No se puede cancelar un pedido ya entregado');
       }
-      
+
+
+	// Verificar si el pedido tiene refenrecian de pago (estado ya ha sido pagado)
+	if (this.referenciaPago) {
+		throw new Error('No se puede cancelar un pedido que ya ha sido pagado');
+		}
+      // Solo se puede cancelar si el pedido  esta en estado 'pendiente y no estado pagado
+		if (this.estado !== 'pendiente') {
       // Para cualquier otro estado (confirmada, en_proceso, enviada, etc.)
       throw new Error('Solo se pueden cancelar pedidos que están en estado pendiente');
     }

@@ -6,8 +6,8 @@
 module.exports = {
     // Configuración del servidor
     server: {
-        port: process.env.PORT || 51250,
-        host: process.env.HOST || '192.168.1.106',
+        port: process.env.PORT || 51255,
+        host: process.env.HOST || '192.168.3.6',
         environment: process.env.NODE_ENV || 'development'
     },
 
@@ -16,7 +16,7 @@ module.exports = {
         firebird: {
             host: process.env.FIREBIRD_HOST || '192.168.3.104',
             port: process.env.FIREBIRD_PORT || 3050,
-            database: process.env.FIREBIRD_DATABASE || 'C:\\Datos TNS\\PRUEBA.GDB',
+            database: process.env.FIREBIRD_DATABASE || 'C:/DATOS_TNS/PRUEBA.GDB',
             user: process.env.FIREBIRD_USER || 'SYSDBA',
             password: process.env.FIREBIRD_PASSWORD || 'masterkey',
             lowercase_keys: false,
