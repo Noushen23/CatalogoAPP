@@ -21,6 +21,18 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export interface ForgotPasswordRequest {
+  tipoIdentificacion: 'CC' | 'NIT' | 'CE' | 'TR';
+  numeroIdentificacion: string;
+}
+
+export interface ResetPasswordRequest {
+  tipoIdentificacion: 'CC' | 'NIT' | 'CE' | 'TR';
+  numeroIdentificacion: string;
+  code: string;
+  newPassword: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -146,5 +158,15 @@ export const authApi = {
     }
     
     return true;
+  },
+
+  // Solicitar recuperación de contraseña
+  async forgotPassword(data: ForgotPasswordRequest): Promise<ApiResponse> {
+    return await apiClient.post('/auth/forgot-password', data);
+  },
+
+  // Restablecer contraseña con código
+  async resetPassword(data: ResetPasswordRequest): Promise<ApiResponse> {
+    return await apiClient.post('/auth/reset-password', data);
   }
 };

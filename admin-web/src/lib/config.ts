@@ -8,17 +8,17 @@
 const SERVER_CONFIG = {
   // Servidor local (API principal)
   LOCAL: {
-    HOST: '192.168.3.6',
+    HOST: '192.168.3.104',
     PORT: 3001,
   },
   // Base de datos TNS (Apimaterial)
   TNS: {
-    HOST: '192.168.3.6',
+    HOST: '192.168.3.104',
     PORT: 51255,
   },
   // IP pública (producción)
   PUBLIC: {
-    HOST: '181.49.225.64',
+    HOST: '192.168.3.104',
     PORT: 3001,
   },
 } as const

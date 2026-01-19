@@ -315,7 +315,7 @@ class Favorite {
     }
     
     // Construir URL completa usando la configuración
-    const baseUrl = config.apiBaseUrl || 'http://181.49.225.64:3001';
+    const baseUrl = config.apiBaseUrl || 'http://192.168.3.104:3001';
     return imagePath.startsWith('/') 
       ? `${baseUrl}${imagePath}`
       : `${baseUrl}/${imagePath}`;

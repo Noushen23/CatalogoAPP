@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -25,18 +25,19 @@ import { ShippingAddressSelector } from '@/presentation/shipping/components/Ship
 import { useLocation, AddressData } from '@/presentation/location/hooks/useLocation';
 import { LocationSelector } from '@/presentation/location/components/LocationSelector';
 import { useCreateOrderFromCart } from '@/presentation/orders/hooks/useOrders';
-import { CreateOrderFromCartRequest } from '@/core/api/ordersApi';
+import { CreateOrderFromCartRequest, ordersApi } from '@/core/api/ordersApi';
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { formatCurrency } from '@/presentation/utils';
-
-// Costo fijo de envío
-const SHIPPING_COST = 5000;
+import { useCrearTransaccion } from '@/presentation/pagos/hooks/usePagos';
 
 export default function CheckoutScreen() {
   // El ID de la dirección seleccionada se guardará aquí
-  const [selectedAddressId, setSelectedAddressId] = useState<string | undefined>(undefined);
+  const [seleccionadaDireccionId, setSeleccionadaDireccionId] = useState<string | undefined>(undefined);
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia' | 'pse'>('efectivo');
   const [notes, setNotes] = useState('');
+  const [direccionCost, setDireccionCost] = useState(0);
+  const [direccionZona, setDireccionZona] = useState<string | null>(null);
+  const [isCalculandoDireccion, setIsCalculandoDireccion] = useState(false);
 
   const tintColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
@@ -53,6 +54,9 @@ export default function CheckoutScreen() {
   
   // Hook para crear pedido
   const createOrderMutation = useCreateOrderFromCart();
+  
+  // Hook para crear transacción de pago con Wompi
+  const crearTransaccionMutation = useCrearTransaccion();
 
   // Hook para obtener ubicación GPS
   const { getLocationAndAddress, isLoading: isLocationLoading } = useLocation({
@@ -60,9 +64,54 @@ export default function CheckoutScreen() {
     timeout: 15000
   });
 
+  // Calcular costo de envío cuando cambie el subtotal o la dirección
+  useEffect(() => {
+    const calcularEnvio = async () => {
+      if (!cart || cart.items.length === 0) {
+        setDireccionCost(0);
+        setDireccionZona(null);
+        return;
+      }
+
+      const subtotal = parseFloat(cart.total as any) || 0;
+      
+      // Si no hay dirección seleccionada, usar costo por defecto
+      if (!seleccionadaDireccionId) {
+        // Envío gratis si >= $300.000, de lo contrario usar un valor estimado
+        const costoEstimado = subtotal >= 300000 ? 0 : 5000;
+        setDireccionCost(costoEstimado);
+        setDireccionZona(null);
+        return;
+      }
+
+      setIsCalculandoDireccion(true);
+      try {
+        const response = await ordersApi.calcularCostoEnvio({
+          subtotal,
+          direccionEnvioId: seleccionadaDireccionId
+        });
+
+        if (response.success && response.data) {
+          setDireccionCost(response.data.costoEnvio);
+          setDireccionZona(response.data.zona);
+        }
+      } catch (error) {
+        console.error('Error al calcular costo de envío:', error);
+        // En caso de error, usar cálculo por defecto
+        const defaultCost = subtotal >= 300000 ? 0 : 5000;
+        setDireccionCost(defaultCost);
+        setDireccionZona(null);
+      } finally {
+        setIsCalculandoDireccion(false);
+      }
+    };
+
+    calcularEnvio();
+  }, [cart, seleccionadaDireccionId]);
+
   // Manejar selección de dirección
   const handleAddressSelect = (addressId: string) => {
-    setSelectedAddressId(addressId);
+    setSeleccionadaDireccionId(addressId);
   };
 
   // Navegar a la pantalla de creación de dirección
@@ -99,28 +148,102 @@ export default function CheckoutScreen() {
       return;
     }
 
-    if (!selectedAddressId) {
+    if (!seleccionadaDireccionId) {
       Alert.alert('Error', 'Debes seleccionar una dirección de envío.');
       return;
     }
 
     try {
+      // Métodos de pago que requieren integración con Wompi
+      const metodosWompi = ['tarjeta', 'pse'];
+      const requiereWompi = metodosWompi.includes(paymentMethod);
+
+      // Crear pedido primero
       const orderData: CreateOrderFromCartRequest = {
-        direccionEnvioId: selectedAddressId, // <-- AHORA ENVIAMOS EL ID
+        direccionEnvioId: seleccionadaDireccionId,
         metodoPago: paymentMethod,
-        referenciaPago: `REF-${Date.now()}`,
+        // No asignar referenciaPago todavía si es pago con Wompi (se asignará después)
+        referenciaPago: requiereWompi ? undefined : `REF-${Date.now()}`,
         notas: notes.trim() || undefined,
       };
 
-      // Crear pedido usando el hook de React Query
       const orderResult = await createOrderMutation.mutateAsync(orderData);
 
-      // Si llegamos aquí, el pedido se creó exitosamente
-      // El hook ya maneja la invalidación de cache y limpieza del carrito
-      
-      // Verificar que tenemos datos del pedido
-      if (orderResult) {
-        // Mostrar alerta de éxito
+      if (!orderResult || !orderResult.id) {
+        throw new Error('No se recibieron datos del pedido creado');
+      }
+
+      // Si el método de pago requiere Wompi, crear la transacción
+      if (requiereWompi) {
+        try {
+          // Crear transacción de pago con Wompi
+          const transaccionData = {
+            pedidoId: orderResult.id,
+            metodoPago: paymentMethod as 'tarjeta' | 'pse',
+            // Para tarjeta, el token se obtiene del frontend (Wompi Widget)
+            // Para PSE, se necesitan datos bancarios
+            // Por ahora, creamos la transacción y Wompi manejará el flujo
+          };
+
+          const transaccionResult = await crearTransaccionMutation.mutateAsync(transaccionData);
+
+          if (transaccionResult && transaccionResult.urlRedireccion) {
+            // Redirigir a la URL de pago de Wompi
+            // En React Native, esto se puede hacer con Linking
+            const { Linking } = require('react-native');
+            const canOpen = await Linking.canOpenURL(transaccionResult.urlRedireccion);
+            
+            if (canOpen) {
+              Alert.alert(
+                'Redirigiendo a Wompi',
+                'Serás redirigido a la pasarela de pagos para completar tu compra.',
+                [
+                  {
+                    text: 'Continuar',
+                    onPress: async () => {
+                      await Linking.openURL(transaccionResult.urlRedireccion!);
+                      // Después del pago, Wompi redirigirá de vuelta a la app
+                      // El webhook actualizará el estado del pedido
+                    }
+                  }
+                ]
+              );
+            } else {
+              // Si no se puede abrir la URL, mostrar información
+              Alert.alert(
+                'Pago Pendiente',
+                `Tu pedido ${orderResult.numeroOrden} ha sido creado. Por favor, completa el pago usando la siguiente URL:\n\n${transaccionResult.urlRedireccion}`,
+                [
+                  {
+                    text: 'Ver Pedido',
+                    onPress: () => {
+                      router.replace(`/(customer)/order-confirmation/${orderResult.id}` as any);
+                    }
+                  }
+                ]
+              );
+            }
+          } else {
+            throw new Error('No se recibió URL de redirección de Wompi');
+          }
+        } catch (errorPago) {
+          console.error('Error al crear transacción de pago:', errorPago);
+          // El pedido ya fue creado, pero el pago falló
+          Alert.alert(
+            'Pedido Creado - Pago Pendiente',
+            `Tu pedido ${orderResult.numeroOrden} ha sido creado, pero hubo un error al procesar el pago. Puedes intentar pagar más tarde desde el detalle del pedido.`,
+            [
+              {
+                text: 'Ver Pedido',
+                onPress: () => {
+                  router.replace(`/(customer)/order-confirmation/${orderResult.id}` as any);
+                }
+              }
+            ]
+          );
+        }
+      } else {
+        // Para métodos de pago que no requieren Wompi (efectivo, transferencia)
         Alert.alert(
           '¡Pedido Creado Exitosamente!',
           `Tu pedido ${orderResult.numeroOrden} ha sido procesado correctamente.`,
@@ -128,9 +251,7 @@ export default function CheckoutScreen() {
             {
               text: 'Ver Pedido',
               onPress: () => {
-                if (orderResult.id) {
-                  router.replace(`/(customer)/order-confirmation/${orderResult.id}` as any);
-                }
+                router.replace(`/(customer)/order-confirmation/${orderResult.id}` as any);
               }
             },
             {
@@ -139,12 +260,9 @@ export default function CheckoutScreen() {
             }
           ]
         );
-      } else {
-        throw new Error('No se recibieron datos del pedido creado');
       }
 
     } catch (error) {
-      // El hook ya maneja el logging de errores, solo mostramos al usuario
       console.error('Error en handleConfirmOrder:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'Error al crear el pedido';
@@ -194,11 +312,10 @@ export default function CheckoutScreen() {
 
   // Cálculos de totales
   const subtotal = parseFloat(cart.total as any) || 0;
-  const shipping = subtotal >= 300000 ? 0 : SHIPPING_COST; // Envío gratis si >= $300.000
-  const total = subtotal + shipping;
+  const total = subtotal + direccionCost;
 
   // Estado de procesamiento
-  const isProcessing = createOrderMutation.isPending;
+  const isProcessing = createOrderMutation.isPending || crearTransaccionMutation.isPending;
 
   return (
     <ThemedView style={styles.container}>
@@ -249,10 +366,23 @@ export default function CheckoutScreen() {
               </View>
               
               <View style={styles.summaryRow}>
-                <ThemedText style={styles.summaryLabel}>Envío</ThemedText>
-                <ThemedText style={styles.summaryValue}>
-                  {formatCurrency(shipping)}
-                </ThemedText>
+                <View style={styles.direccionInfo}>
+                  <ThemedText style={styles.summaryLabel}>Envío</ThemedText>
+                  {direccionZona && (
+                    <ThemedText style={styles.direccionZona}>
+                      {direccionZona}
+                    </ThemedText>
+                  )}
+                </View>
+                <View style={styles.direccionCostContainer}>
+                  {isCalculandoDireccion ? (
+                    <ActivityIndicator size="small" color={tintColor} />
+                  ) : (
+                    <ThemedText style={styles.summaryValue}>
+                      {direccionCost === 0 ? 'Gratis' : formatCurrency(direccionCost)}
+                    </ThemedText>
+                  )}
+                </View>
               </View>
               
               <View style={[styles.summaryRow, styles.totalRow]}>
@@ -283,7 +413,7 @@ export default function CheckoutScreen() {
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Dirección de Envío</ThemedText>
             <ShippingAddressSelector
-              selectedAddressId={selectedAddressId}
+              selectedAddressId={seleccionadaDireccionId}
               onAddressSelect={handleAddressSelect}
               onAddressCreate={handleAddressCreate}
             />
@@ -585,5 +715,16 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 32,
+  },
+  direccionInfo: {
+    flex: 1,
+  },
+  direccionZona: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  direccionCostContainer: {
+    alignItems: 'flex-end',
   },
 });

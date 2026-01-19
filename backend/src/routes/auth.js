@@ -9,6 +9,8 @@ const { validateRegister, validateLogin, validateChangePassword } = require('../
 router.post('/register', validateRegister, AuthController.register);
 router.post('/login', validateLogin, AuthController.login);
 router.post('/refresh-token', AuthController.refreshToken);
+router.post('/forgot-password', AuthController.forgotPassword);
+router.post('/reset-password', AuthController.resetPassword);
 
 // Rutas protegidas
 router.get('/status', authenticateToken, AuthController.getStatus);

@@ -74,6 +74,16 @@ class User {
     return users.length > 0 ? new User(users[0]) : null;
   }
 
+  // Buscar usuario por documento (tipo y número)
+  static async findByDocument(tipoIdentificacion, numeroIdentificacion) {
+    if (!tipoIdentificacion || !numeroIdentificacion) {
+      return null;
+    }
+    const sql = 'SELECT * FROM usuarios WHERE tipo_identificacion = ? AND numero_identificacion = ? AND activo = true';
+    const users = await query(sql, [tipoIdentificacion, numeroIdentificacion]);
+    return users.length > 0 ? new User(users[0]) : null;
+  }
+
   // Verificar contraseña
   async verifyPassword(password) {
     try {

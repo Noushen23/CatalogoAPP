@@ -379,6 +379,90 @@ class EmailService {
   }
 
   /**
+   * Enviar email de recuperación de contraseña
+   */
+  async sendPasswordRecoveryEmail(email, nombre, codigo) {
+    try {
+      // En modo desarrollo sin configuración SMTP, simular envío
+      if (!this.transporter) {
+        console.log('📧 [SIMULACIÓN] Email de recuperación de contraseña para:', email);
+        console.log('📧 [SIMULACIÓN] Código:', codigo);
+        console.log('📧 [SIMULACIÓN] Nombre:', nombre);
+        return {
+          success: true,
+          message: 'Email simulado (modo desarrollo)',
+          messageId: 'simulated-' + Date.now(),
+        };
+      }
+
+      const recoveryHtml = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; }
+            .header { background: linear-gradient(135deg, #f44336 0%, #e91e63 100%); padding: 40px; text-align: center; color: white; }
+            .content { padding: 40px 30px; }
+            .code { background: #f8f9fa; border: 2px dashed #f44336; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0; }
+            .code-number { font-size: 36px; font-weight: bold; color: #f44336; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }
+            .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔐 Recuperación de Contraseña</h1>
+            </div>
+            <div class="content">
+              <p>¡Hola ${nombre}!</p>
+              <p>Has solicitado recuperar tu contraseña. Para crear una nueva contraseña, ingresa el siguiente código de verificación:</p>
+              <div class="code">
+                <div class="code-number">${codigo}</div>
+              </div>
+              <div class="warning">
+                <strong>⚠️ Importante:</strong> Este código es válido por 30 minutos. Si no solicitaste recuperar tu contraseña, puedes ignorar este correo de forma segura.
+              </div>
+              <p>Si no solicitaste este cambio, te recomendamos verificar la seguridad de tu cuenta.</p>
+            </div>
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} ${config.app.name}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const mailOptions = {
+        from: `"${config.app.name}" <${config.email.from}>`,
+        to: email,
+        subject: `Recuperación de contraseña - ${config.app.name}`,
+        html: recoveryHtml,
+        text: `Hola ${nombre},\n\nHas solicitado recuperar tu contraseña en ${config.app.name}.\n\nTu código de verificación es: ${codigo}\n\nEste código es válido por 30 minutos.\n\nSi no solicitaste este cambio, puedes ignorar este correo.\n\nSaludos,\nEl equipo de ${config.app.name}`,
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('✅ Email de recuperación de contraseña enviado:', info.messageId);
+
+      return {
+        success: true,
+        message: 'Email enviado correctamente',
+        messageId: info.messageId,
+      };
+    } catch (error) {
+      console.error('❌ Error al enviar email de recuperación de contraseña:', error);
+      return {
+        success: false,
+        message: 'Error al enviar el email',
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Enviar email de bienvenida después de verificación exitosa
    */
   async sendWelcomeEmail(email, nombre) {

@@ -37,10 +37,8 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   const clearCartMutation = useClearCart();
   const validateCartQuery = useValidateCart();
 
-  // Calcular valores directamente
+  // Calcular subtotal
   const subtotal = parseFloat(total as any) || 0;
-  const shipping = subtotal >= 300000 ? 0 : 15000; // Envío gratis si >= $300.000
-  const totalWithShipping = subtotal + shipping;
 
   const handleClearCart = () => {
     Alert.alert(
@@ -139,24 +137,10 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
 
       {/* Detalles del total */}
       <View style={styles.totalContainer}>
-        <View style={styles.totalRow}>
-         <ThemedText style={styles.totalLabel}>Subtotal:</ThemedText>
-         <ThemedText style={styles.totalValue}>
-          {formatCurrency(Math.round(subtotal))}
-         </ThemedText>
-        </View>
-        
-        <View style={styles.totalRow}>
-          <ThemedText style={styles.totalLabel}>Envío:</ThemedText>
-          <ThemedText style={styles.totalValue}>
-            {shipping === 0 ? 'Gratis' : formatCurrency(Math.round(shipping))}
-          </ThemedText>
-        </View>
-        
         <View style={[styles.totalRow, styles.finalTotalRow]}>
           <ThemedText style={styles.finalTotalLabel}>Total:</ThemedText>
           <ThemedText style={[styles.finalTotalValue, { color: tintColor }]}>
-            {formatCurrency(Math.round(totalWithShipping))}
+            {formatCurrency(Math.round(subtotal))}
           </ThemedText>
         </View>
       </View>

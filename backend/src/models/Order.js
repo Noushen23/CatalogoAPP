@@ -33,6 +33,40 @@ class Order {
     this.entrega = data.entrega || null;
   }
 
+  // Calcular costo de envío por zonas
+  static calcularCostoEnvio(subtotal, ciudad) {
+    // Envío gratis si el subtotal es >= $300.000
+    if (subtotal >= 300000) {
+      return 0;
+    }
+
+    // Normalizar nombre de ciudad para comparación (sin acentos, mayúsculas)
+    const ciudadNormalizada = ciudad ? ciudad.toLowerCase().trim() : '';
+    
+    // Definición de zonas y costos
+    const ZONA_URBANA = {
+      ciudades: ['cúcuta', 'cucuta'],
+      costo: 5000
+    };
+    
+    const MUNICIPIOS_CERCANOS = {
+      ciudades: ['el zulia', 'san cayetano', 'villa del rosario', 'villa del rosario de cúcuta'],
+      costo: 8000
+    };
+    
+    // Determinar zona
+    if (ZONA_URBANA.ciudades.includes(ciudadNormalizada)) {
+      return ZONA_URBANA.costo;
+    }
+    
+    if (MUNICIPIOS_CERCANOS.ciudades.includes(ciudadNormalizada)) {
+      return MUNICIPIOS_CERCANOS.costo;
+    }
+    
+    // Resto (cualquier otra ciudad)
+    return 12000;
+  }
+
   // Crear pedido desde carrito
   static async createFromCart(cartData) {
     console.log('🚀 Iniciando createFromCart con datos:', {
@@ -95,15 +129,36 @@ class Order {
         }
       }
 
-      // 2. GENERAR NÚMERO DE ORDEN ÚNICO
+      // 2. OBTENER DIRECCIÓN DE ENVÍO PARA CALCULAR COSTO POR ZONA
+      let ciudadEnvio = null;
+      if (direccionEnvioId) {
+        const direccionesSql = `
+          SELECT ciudad 
+          FROM direcciones_envio 
+          WHERE id = ? AND usuario_id = ? AND activa = true
+        `;
+        const [direcciones] = await connection.execute(direccionesSql, [direccionEnvioId, usuarioId]);
+        
+        if (direcciones.length > 0) {
+          ciudadEnvio = direcciones[0].ciudad;
+          console.log('📍 Ciudad de envío detectada:', ciudadEnvio);
+        } else {
+          console.warn('⚠️ Dirección de envío no encontrada o inactiva');
+        }
+      }
+
+      // 3. GENERAR NÚMERO DE ORDEN ÚNICO
       const numeroOrden = await this.generateOrderNumber();
       
-      // 3. CALCULAR TOTALES
+      // 4. CALCULAR TOTALES
       const subtotal = items.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-      const costoEnvio = 5000; // Costo fijo de envío
-      const impuestos = 0; // Por ahora sin impuestos
-      const descuento = 0; // Por ahora sin descuentos
+      // Calcular costo de envío por zona
+      const costoEnvio = Order.calcularCostoEnvio(subtotal, ciudadEnvio);
+      
+      const impuestos = 0;
+      const descuento = 0;
       const total = subtotal - descuento + costoEnvio + impuestos;
+      
 
       const id = uuidv4();
 
@@ -379,24 +434,23 @@ class Order {
 
   // Cancelar pedido
   async cancel(reason = null) {
-		// Verificar si el pedido ya esta cancelado
-
-      if (this.estado === 'cancelada') {
-        throw new Error('El pedido ya está cancelado');
-      }
-
-      //Verififcar si el peido ya fue entregado 
-      if (this.estado === 'entregada') {
-        throw new Error('No se puede cancelar un pedido ya entregado');
-      }
-
-
-	// Verificar si el pedido tiene refenrecian de pago (estado ya ha sido pagado)
-	if (this.referenciaPago) {
-		throw new Error('No se puede cancelar un pedido que ya ha sido pagado');
-		}
-      // Solo se puede cancelar si el pedido  esta en estado 'pendiente y no estado pagado
-		if (this.estado !== 'pendiente') {
+    // Verificar si el pedido ya está cancelado
+    if (this.estado === 'cancelada') {
+      throw new Error('El pedido ya está cancelado');
+    }
+    
+    // Verificar si el pedido ya fue entregado
+    if (this.estado === 'entregada') {
+      throw new Error('No se puede cancelar un pedido ya entregado');
+    }
+    
+    // Verificar si el pedido tiene referencia de pago (está pagado)
+    if (this.referenciaPago) {
+      throw new Error('No se puede cancelar un pedido que ya ha sido pagado. Contacta al administrador para más información.');
+    }
+    
+    // Solo se puede cancelar si el pedido está en estado 'pendiente' y no está pagado
+    if (this.estado !== 'pendiente') {
       // Para cualquier otro estado (confirmada, en_proceso, enviada, etc.)
       throw new Error('Solo se pueden cancelar pedidos que están en estado pendiente');
     }

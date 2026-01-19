@@ -82,9 +82,9 @@ export const PersonalInfo: React.FC<PersonalInfoProps> = React.memo(({ profile }
   const formattedValues = useMemo(() => ({
     birthDate: formatDate(profile.fechaNacimiento),
     gender: formatGender(profile.genero),
-    phone: formatPhone(profile.usuario?.telefono),
+    phone: formatPhone(profile.usuario?.telefono || profile.phone),
     address: formatAddress(profile.usuario?.direccion),
-  }), [profile.fechaNacimiento, profile.genero, profile.usuario?.telefono, profile.usuario?.direccion]);
+  }), [profile.fechaNacimiento, profile.genero, profile.usuario?.telefono, profile.phone, profile.usuario?.direccion]);
 
   // Handlers optimizados
   const handleEditBirthDate = useCallback(() => {
@@ -160,9 +160,9 @@ export const PersonalInfo: React.FC<PersonalInfoProps> = React.memo(({ profile }
         },
       ],
       'plain-text',
-      profile.usuario?.telefono || ''
+      profile.usuario?.telefono || profile.phone || ''
     );
-  }, [profile.usuario?.telefono, updateUserInfoMutation]);
+  }, [profile.usuario?.telefono, profile.phone, updateUserInfoMutation]);
 
   const handleEditAddress = useCallback(() => {
     Alert.prompt(

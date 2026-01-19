@@ -224,9 +224,6 @@ router.put('/notifications', validateNotificationPreferences, ProfileController.
 // Actualizar configuración de privacidad
 router.put('/privacy', validatePrivacySettings, ProfileController.updatePrivacySettings);
 
-// Obtener estadísticas del perfil
-router.get('/stats', ProfileController.getProfileStats);
-
 // Registrar token de push para notificaciones
 router.post('/push-token', validatePushToken, ProfileController.registerPushToken);
 

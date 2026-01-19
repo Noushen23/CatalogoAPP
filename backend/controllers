@@ -191,7 +191,7 @@ class ProductController {
         throw new Error(`products no es un array: ${typeof products}`);
       }
 
-      const baseUrl = process.env.APP_URL || 'http://192.168.3.6:3001';
+      const baseUrl = process.env.APP_URL || 'http://192.168.3.104:3001';
       
       // Obtener imágenes para todos los productos de forma separada (más confiable)
       const formattedProducts = await Promise.all(products.map(async (product) => {

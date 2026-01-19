@@ -123,6 +123,9 @@ router.get('/my-stats', OrderController.getUserOrderStats);
 // Obtener pedido específico del usuario
 router.get('/my-orders/:id', validateOrderId, OrderController.getUserOrder);
 
+// Calcular costo de envío
+router.post('/calcular-costo-envio', OrderController.calcularCostoEnvio);
+
 // Crear pedido desde carrito
 router.post('/create-from-cart', validateCreateOrderFromCart, handleValidationErrors, OrderController.createOrderFromCart);
 

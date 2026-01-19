@@ -84,14 +84,17 @@ isOrderStatusFinal('entregada');  // true
 isOrderStatusFinal('en_proceso'); // false
 ```
 
-### `canCancelOrder(status)`
+### `canCancelOrder(status, referenciaPago?)`
 
-Verifica si un pedido puede ser cancelado.
+Verifica si un pedido puede ser cancelado. Un pedido no puede ser cancelado si:
+- No está en estado 'pendiente'
+- Tiene una referencia de pago (está pagado)
 
 ```typescript
 import { canCancelOrder } from '@/presentation/orders/utils';
 
 canCancelOrder('pendiente');  // true
+canCancelOrder('pendiente', 'REF-123');  // false (está pagado)
 canCancelOrder('entregada');  // false
 ```
 

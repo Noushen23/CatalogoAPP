@@ -35,8 +35,8 @@ const config = {
         'http://192.168.3.104:8082', // Expo web alternativo
         'http://192.168.3.104:3000', // Admin web específico
         'http://192.168.3.104:3001', // Android emulator
-        'http://181.49.225.64:3000', // Admin web servidor remoto
-        'http://181.49.225.64:3001', // API servidor remoto
+        'http://192.168.3.104:3000', // Admin web servidor remoto
+        'http://192.168.3.104:3001', // API servidor remoto
       ];
       
       // Patrones para IPs locales, públicas y servidor remoto
@@ -80,7 +80,7 @@ const config = {
   app: {
     name: process.env.APP_NAME || 'Tienda Móvil',
     version: process.env.APP_VERSION || '1.0.0',
-    url: process.env.APP_URL || process.env.API_BASE_URL || 'http://181.49.225.64:3001'
+    url: process.env.APP_URL || process.env.API_BASE_URL || 'http://192.168.3.104:3001'
   },
   
   // Configuración de email (opcional)
@@ -104,7 +104,7 @@ const config = {
   // FORZAR IP pública para que las imágenes sean accesibles desde cualquier lugar
   apiBaseUrl: (() => {
     // IP pública del servidor (siempre usar esta para imágenes)
-    const IP_PUBLICA = '192.168.3.6';
+    const IP_PUBLICA = '192.168.3.104';
     const PUERTO = process.env.PORT || 3001;
     const apiBaseUrl = `http://${IP_PUBLICA}:${PUERTO}`;
     
@@ -138,18 +138,18 @@ const config = {
       const envUrl = process.env.TERCERO_API_URL;
       const isProduction = process.env.NODE_ENV === 'production';
       
-      // En desarrollo, SIEMPRE usar 192.168.3.6 (ignorar variable de entorno si está mal configurada)
+      // En desarrollo, SIEMPRE usar 192.168.3.104 (ignorar variable de entorno si está mal configurada)
       const defaultUrl = isProduction
-        ? 'http://181.49.225.64:51255'
-        : 'http://192.168.3.6:51255';  // IP del servidor en desarrollo
+        ? 'http://192.168.3.104:51255'
+        : 'http://192.168.3.104:51255';  // IP del servidor en desarrollo
       
-      // En desarrollo, SIEMPRE forzar el uso de 192.168.3.6 (ignorar cualquier variable de entorno)
+      // En desarrollo, SIEMPRE forzar el uso de 192.168.3.104 (ignorar cualquier variable de entorno)
       let finalUrl = defaultUrl;
       if (isProduction && envUrl) {
         // En producción, usar variable de entorno si está configurada
         finalUrl = envUrl;
       }
-      // En desarrollo, siempre usar defaultUrl (192.168.3.6) sin importar la variable de entorno
+      // En desarrollo, siempre usar defaultUrl (192.168.3.104) sin importar la variable de entorno
       
       // Log de configuración
       console.log('🔧 Configuración ApiTercero:', {
@@ -157,7 +157,7 @@ const config = {
         'URL por defecto (forzada)': defaultUrl,
         'URL final utilizada': finalUrl,
         'NODE_ENV': process.env.NODE_ENV || 'development',
-        'Nota': isProduction ? 'Usando variable de entorno si está configurada' : 'FORZADO a 192.168.3.6 en desarrollo'
+        'Nota': isProduction ? 'Usando variable de entorno si está configurada' : 'FORZADO a 192.168.3.104 en desarrollo'
       });
       
       return finalUrl;
@@ -165,15 +165,28 @@ const config = {
     token: process.env.TERCERO_API_TOKEN || 'angeldavidcapa2025'
   },
 
-  // Configuración de APIs de Mapas
-  maps: {
-    provider: process.env.MAPS_PROVIDER || 'google', // 'google' o 'mapbox'
-    google: {
-      apiKey: process.env.GOOGLE_MAPS_API_KEY || ''
-    },
-    mapbox: {
-      accessToken: process.env.MAPBOX_ACCESS_TOKEN || ''
-    }
+
+
+  // Configuración de Wompi (Pasarela de Pagos)
+  wompi: {
+    // URL base de producción
+    urlBase: process.env.WOMPI_URL_BASE || 'https://production.wompi.co/v1',
+    // URL base de pruebas/sandbox
+    urlBasePruebas: process.env.WOMPI_URL_BASE_PRUEBAS || 'https://sandbox.wompi.co/v1',
+    // Clave pública (para usar en frontend)
+    clavePublica: process.env.WOMPI_CLAVE_PUBLICA || '',
+    // Clave privada (solo backend, nunca exponer)
+    clavePrivada: process.env.WOMPI_CLAVE_PRIVADA || '',
+    // Clave de integridad (para validar webhooks)
+    claveIntegridad: process.env.WOMPI_CLAVE_INTEGRIDAD || '',
+    // Ambiente: 'produccion' o 'pruebas'
+    ambiente: process.env.WOMPI_AMBIENTE || 'pruebas',
+    // Moneda por defecto
+    moneda: process.env.WOMPI_MONEDA || 'COP',
+    // URL de redirección después del pago exitoso
+    urlRedireccion: process.env.WOMPI_URL_REDIRECCION || '',
+    // URL de redirección en caso de error
+    urlRedireccionError: process.env.WOMPI_URL_REDIRECCION_ERROR || ''
   }
 };
 

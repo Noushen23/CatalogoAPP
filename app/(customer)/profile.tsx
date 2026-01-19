@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -17,9 +20,8 @@ import { ThemedText } from '@/presentation/theme/components/ThemedText';
 import { useThemeColor } from '@/presentation/theme/hooks/useThemeColor';
 import { CartIndicator } from '@/presentation/cart/components/CartIndicator';
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
-import { useProfile, useProfileStats, useUpdateUserInfo, useChangePassword, useRequestChangeEmail, useVerifyChangeEmail } from '@/presentation/profile/hooks/useProfile';
+import { useProfile, useUpdateUserInfo, useChangePassword, useRequestChangeEmail, useVerifyChangeEmail } from '@/presentation/profile/hooks/useProfile';
 import { ProfileHeader } from '@/presentation/profile/components/ProfileHeader';
-import { ProfileStats } from '@/presentation/profile/components/ProfileStats';
 import { PersonalInfo } from '@/presentation/profile/components/PersonalInfo';
 import { useAuthRedirect } from '@/presentation/auth/hooks/useAuthRedirect';
 
@@ -31,6 +33,27 @@ export default function ProfileScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   
+  // Estados para modales de edición
+  const [showEditNombreModal, setShowEditNombreModal] = useState(false);
+  const [nombreValue, setNombreValue] = useState('');
+  const [showEditDocumentoModal, setShowEditDocumentoModal] = useState(false);
+  const [documentoType, setDocumentoType] = useState<'CC' | 'NIT' | 'CE' | 'TR' | ''>('');
+  const [documentoValue, setDocumentoValue] = useState('');
+  
+  // Estados para modales de contraseña
+  const [showPasswordModal1, setShowPasswordModal1] = useState(false); // Contraseña actual
+  const [showPasswordModal2, setShowPasswordModal2] = useState(false); // Nueva contraseña
+  const [showPasswordModal3, setShowPasswordModal3] = useState(false); // Confirmar contraseña
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Estados para modales de email
+  const [showEmailModal1, setShowEmailModal1] = useState(false); // Nuevo email
+  const [showEmailModal2, setShowEmailModal2] = useState(false); // Código de verificación
+  const [newEmail, setNewEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  
   const tintColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
 
@@ -39,7 +62,6 @@ export default function ProfileScreen() {
 
   // Hooks para obtener datos del perfil
   const { data: profileData, isLoading: profileLoading, refetch: refetchProfile } = useProfile();
-  const { data: profileStats, isLoading: statsLoading, refetch: refetchStats } = useProfileStats();
   const updateUserInfoMutation = useUpdateUserInfo();
   const changePasswordMutation = useChangePassword();
   const requestChangeEmailMutation = useRequestChangeEmail();
@@ -73,7 +95,7 @@ export default function ProfileScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refetchProfile(), refetchStats()]);
+      await refetchProfile();
     } catch (error) {
       console.error('Error al actualizar perfil:', error);
     } finally {
@@ -82,23 +104,24 @@ export default function ProfileScreen() {
   };
 
   const handleEditNombre = () => {
-    Alert.prompt(
-      'Editar Nombre',
-      'Ingresa tu nombre completo:',
-      [
-        { text: 'Cancelar', style: 'cancel' },
+    setNombreValue(user?.nombreCompleto || '');
+    setShowEditNombreModal(true);
+  };
+
+  const handleSaveNombre = () => {
+    if (nombreValue && nombreValue.trim()) {
+      updateUserInfoMutation.mutate(
+        { nombreCompleto: nombreValue.trim() },
         {
-          text: 'Guardar',
-          onPress: (nombre?: string) => {
-            if (nombre && nombre.trim()) {
-              updateUserInfoMutation.mutate({ nombreCompleto: nombre.trim() });
-            }
+          onSuccess: () => {
+            setShowEditNombreModal(false);
+            setNombreValue('');
           },
-        },
-      ],
-      'plain-text',
-      user?.nombreCompleto || ''
-    );
+        }
+      );
+    } else {
+      Alert.alert('Error', 'El nombre no puede estar vacío');
+    }
   };
 
   const handleEditDocumento = () => {
@@ -111,105 +134,67 @@ export default function ProfileScreen() {
         {
           text: 'CC',
           onPress: () => {
-            Alert.prompt(
-              'Número de Cédula',
-              'Ingresa tu número de cédula:',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Guardar',
-                  onPress: (numero?: string) => {
-                    if (numero && numero.trim()) {
-                      updateUserInfoMutation.mutate({
-                        tipoIdentificacion: 'CC',
-                        numeroIdentificacion: numero.trim(),
-                      });
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              user?.numeroIdentificacion || ''
-            );
+            setDocumentoType('CC');
+            setDocumentoValue(user?.numeroIdentificacion || '');
+            setShowEditDocumentoModal(true);
           },
         },
         {
           text: 'NIT',
           onPress: () => {
-            Alert.prompt(
-              'Número de NIT',
-              'Ingresa tu número de NIT:',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Guardar',
-                  onPress: (numero?: string) => {
-                    if (numero && numero.trim()) {
-                      updateUserInfoMutation.mutate({
-                        tipoIdentificacion: 'NIT',
-                        numeroIdentificacion: numero.trim(),
-                      });
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              user?.numeroIdentificacion || ''
-            );
+            setDocumentoType('NIT');
+            setDocumentoValue(user?.numeroIdentificacion || '');
+            setShowEditDocumentoModal(true);
           },
         },
         {
           text: 'CE',
           onPress: () => {
-            Alert.prompt(
-              'Número de Cédula de Extranjería',
-              'Ingresa tu número de cédula de extranjería:',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Guardar',
-                  onPress: (numero?: string) => {
-                    if (numero && numero.trim()) {
-                      updateUserInfoMutation.mutate({
-                        tipoIdentificacion: 'CE',
-                        numeroIdentificacion: numero.trim(),
-                      });
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              user?.numeroIdentificacion || ''
-            );
+            setDocumentoType('CE');
+            setDocumentoValue(user?.numeroIdentificacion || '');
+            setShowEditDocumentoModal(true);
           },
         },
         {
           text: 'TR',
           onPress: () => {
-            Alert.prompt(
-              'Número de Tarjeta de Identidad',
-              'Ingresa tu número de tarjeta de identidad:',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Guardar',
-                  onPress: (numero?: string) => {
-                    if (numero && numero.trim()) {
-                      updateUserInfoMutation.mutate({
-                        tipoIdentificacion: 'TR',
-                        numeroIdentificacion: numero.trim(),
-                      });
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              user?.numeroIdentificacion || ''
-            );
+            setDocumentoType('TR');
+            setDocumentoValue(user?.numeroIdentificacion || '');
+            setShowEditDocumentoModal(true);
           },
         },
       ]
     );
+  };
+
+  const handleSaveDocumento = () => {
+    if (documentoValue && documentoValue.trim() && documentoType) {
+      updateUserInfoMutation.mutate(
+        {
+          tipoIdentificacion: documentoType as 'CC' | 'NIT' | 'CE' | 'TR',
+          numeroIdentificacion: documentoValue.trim(),
+        },
+        {
+          onSuccess: () => {
+            setShowEditDocumentoModal(false);
+            setDocumentoType('');
+            setDocumentoValue('');
+          },
+        }
+      );
+    } else {
+      Alert.alert('Error', 'El número de documento no puede estar vacío');
+    }
+  };
+
+  const getDocumentoLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      CC: 'Cédula de Ciudadanía',
+      NIT: 'NIT',
+      CE: 'Cédula de Extranjería',
+      TR: 'Tarjeta de Identidad',
+    };
+    return labels[type] || type;
   };
 
   const handleChangePassword = () => {
@@ -218,89 +203,73 @@ export default function ProfileScreen() {
       Alert.alert('Espera', 'Ya hay un cambio de contraseña en proceso. Por favor espera.');
       return;
     }
+    // Abrir primer modal (contraseña actual)
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPasswordModal1(true);
+  };
 
-    // Primero pedir la contraseña actual
-    Alert.prompt(
-      'Cambiar Contraseña',
-      'Ingresa tu contraseña actual:',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Continuar',
-          onPress: (currentPassword?: string) => {
-            if (!currentPassword || !currentPassword.trim()) {
-              Alert.alert('Error', 'Debes ingresar tu contraseña actual');
-              return;
-            }
+  const handlePasswordStep1 = () => {
+    if (!currentPassword || !currentPassword.trim()) {
+      Alert.alert('Error', 'Debes ingresar tu contraseña actual');
+      return;
+    }
+    setShowPasswordModal1(false);
+    setShowPasswordModal2(true);
+  };
 
-            // Luego pedir la nueva contraseña
-            Alert.prompt(
-              'Nueva Contraseña',
-              'Ingresa tu nueva contraseña:\n\nDebe tener al menos 6 caracteres, incluir una mayúscula, una minúscula y un número.',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Continuar',
-                  onPress: (newPassword?: string) => {
-                    if (!newPassword || !newPassword.trim()) {
-                      Alert.alert('Error', 'Debes ingresar una nueva contraseña');
-                      return;
-                    }
+  const handlePasswordStep2 = () => {
+    if (!newPassword || !newPassword.trim()) {
+      Alert.alert('Error', 'Debes ingresar una nueva contraseña');
+      return;
+    }
 
-                    if (newPassword.length < 6) {
-                      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
-                      return;
-                    }
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
 
-                    // Validar formato de contraseña
-                    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
-                    if (!passwordRegex.test(newPassword)) {
-                      Alert.alert(
-                        'Error',
-                        'La contraseña debe contener al menos:\n• Una mayúscula\n• Una minúscula\n• Un número'
-                      );
-                      return;
-                    }
+    // Validar formato de contraseña
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+    if (!passwordRegex.test(newPassword)) {
+      Alert.alert(
+        'Error',
+        'La contraseña debe contener al menos:\n• Una mayúscula\n• Una minúscula\n• Un número'
+      );
+      return;
+    }
 
-                    // Confirmar nueva contraseña
-                    Alert.prompt(
-                      'Confirmar Nueva Contraseña',
-                      'Confirma tu nueva contraseña:',
-                      [
-                        { text: 'Cancelar', style: 'cancel' },
-                        {
-                          text: 'Cambiar',
-                          onPress: (confirmPassword?: string) => {
-                            if (!confirmPassword || confirmPassword !== newPassword) {
-                              Alert.alert('Error', 'Las contraseñas no coinciden');
-                              return;
-                            }
+    setShowPasswordModal2(false);
+    setShowPasswordModal3(true);
+  };
 
-                            // Verificar que no haya una mutación en proceso antes de ejecutar
-                            if (changePasswordMutation.isPending) {
-                              Alert.alert('Espera', 'Ya hay un cambio de contraseña en proceso. Por favor espera.');
-                              return;
-                            }
+  const handlePasswordStep3 = () => {
+    if (!confirmPassword || confirmPassword !== newPassword) {
+      Alert.alert('Error', 'Las contraseñas no coinciden');
+      return;
+    }
 
-                            // Cambiar contraseña
-                            changePasswordMutation.mutate({
-                              currentPassword: currentPassword.trim(),
-                              newPassword: newPassword.trim(),
-                            });
-                          },
-                        },
-                      ],
-                      'secure-text'
-                    );
-                  },
-                },
-              ],
-              'secure-text'
-            );
-          },
+    // Verificar que no haya una mutación en proceso antes de ejecutar
+    if (changePasswordMutation.isPending) {
+      Alert.alert('Espera', 'Ya hay un cambio de contraseña en proceso. Por favor espera.');
+      return;
+    }
+
+    // Cambiar contraseña
+    changePasswordMutation.mutate(
+      {
+        currentPassword: currentPassword.trim(),
+        newPassword: newPassword.trim(),
+      },
+      {
+        onSuccess: () => {
+          setShowPasswordModal3(false);
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
         },
-      ],
-      'secure-text'
+      }
     );
   };
 
@@ -310,73 +279,60 @@ export default function ProfileScreen() {
       Alert.alert('Espera', 'Ya hay un cambio de email en proceso. Por favor espera.');
       return;
     }
+    // Abrir primer modal (nuevo email)
+    setNewEmail('');
+    setVerificationCode('');
+    setShowEmailModal1(true);
+  };
 
-    // Primero pedir el nuevo email
-    Alert.prompt(
-      'Cambiar Email',
-      'Ingresa tu nuevo email:',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Continuar',
-          onPress: (newEmail?: string) => {
-            if (!newEmail || !newEmail.trim()) {
-              Alert.alert('Error', 'Debes ingresar un email válido');
-              return;
-            }
+  const handleEmailStep1 = () => {
+    if (!newEmail || !newEmail.trim()) {
+      Alert.alert('Error', 'Debes ingresar un email válido');
+      return;
+    }
 
-            // Validar formato de email básico
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(newEmail.trim())) {
-              Alert.alert('Error', 'El formato del email no es válido');
-              return;
-            }
+    // Validar formato de email básico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail.trim())) {
+      Alert.alert('Error', 'El formato del email no es válido');
+      return;
+    }
 
-            // Verificar que el nuevo email sea diferente al actual
-            if (user?.email && user.email.toLowerCase() === newEmail.trim().toLowerCase()) {
-              Alert.alert('Error', 'El nuevo email debe ser diferente al email actual');
-              return;
-            }
+    // Verificar que el nuevo email sea diferente al actual
+    if (user?.email && user.email.toLowerCase() === newEmail.trim().toLowerCase()) {
+      Alert.alert('Error', 'El nuevo email debe ser diferente al email actual');
+      return;
+    }
 
-            // Solicitar cambio de email (enviar código)
-            requestChangeEmailMutation.mutate(newEmail.trim(), {
-              onSuccess: () => {
-                // Después de enviar el código, pedir el código de verificación
-                Alert.prompt(
-                  'Código de Verificación',
-                  'Hemos enviado un código de verificación a tu nuevo email. Ingresa el código:',
-                  [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                      text: 'Verificar',
-                      onPress: (code?: string) => {
-                        if (!code || !code.trim()) {
-                          Alert.alert('Error', 'Debes ingresar el código de verificación');
-                          return;
-                        }
+    // Solicitar cambio de email (enviar código)
+    requestChangeEmailMutation.mutate(newEmail.trim(), {
+      onSuccess: () => {
+        setShowEmailModal1(false);
+        setShowEmailModal2(true);
+      },
+    });
+  };
 
-                        // Validar que el código tenga 6 dígitos
-                        if (!/^\d{6}$/.test(code.trim())) {
-                          Alert.alert('Error', 'El código debe tener 6 dígitos');
-                          return;
-                        }
+  const handleEmailStep2 = () => {
+    if (!verificationCode || !verificationCode.trim()) {
+      Alert.alert('Error', 'Debes ingresar el código de verificación');
+      return;
+    }
 
-                        // Verificar código y cambiar email
-                        verifyChangeEmailMutation.mutate(code.trim());
-                      },
-                    },
-                  ],
-                  'plain-text'
-                );
-              },
-            });
-          },
-        },
-      ],
-      'plain-text',
-      undefined,
-      'email-address'
-    );
+    // Validar que el código tenga 6 dígitos
+    if (!/^\d{6}$/.test(verificationCode.trim())) {
+      Alert.alert('Error', 'El código debe tener 6 dígitos');
+      return;
+    }
+
+    // Verificar código y cambiar email
+    verifyChangeEmailMutation.mutate(verificationCode.trim(), {
+      onSuccess: () => {
+        setShowEmailModal2(false);
+        setNewEmail('');
+        setVerificationCode('');
+      },
+    });
   };
 
   const menuItems = [
@@ -417,7 +373,7 @@ export default function ProfileScreen() {
       onPress: () => {
         Alert.alert(
           'Acerca de',
-          'Tienda Móvil v1.0.0\n\nDesarrollado con React Native y Expo\n\n© 2024 Todos los derechos reservados',
+          'Tienda Móvil \n\nCuerpo de bomberos voluntarios de cucuta\n\n© 2026 Todos los derechos reservados',
           [{ text: 'Cerrar' }]
         );
       },
@@ -511,14 +467,6 @@ export default function ProfileScreen() {
         )}
 
         {/* Estadísticas del perfil */}
-        {statsLoading ? (
-          <View style={[styles.statsLoadingContainer, { backgroundColor }]}>
-            <ActivityIndicator size="small" color={tintColor} />
-            <ThemedText style={styles.statsLoadingText}>Cargando estadísticas...</ThemedText>
-          </View>
-        ) : profileStats ? (
-          <ProfileStats stats={profileStats} />
-        ) : null}
 
         {/* Información básica del usuario - siempre visible */}
         <View style={styles.userInfoSection}>
@@ -666,6 +614,423 @@ export default function ProfileScreen() {
           </ThemedText>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Modal para editar nombre */}
+      <Modal
+        visible={showEditNombreModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditNombreModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Editar Nombre</ThemedText>
+              <TouchableOpacity onPress={() => setShowEditNombreModal(false)}>
+                <Ionicons name="close" size={24} color={tintColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.modalDescription}>
+              Ingresa tu nombre completo:
+            </ThemedText>
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={[styles.modalInput, { color: useThemeColor({}, 'text') }]}
+                placeholder="Nombre completo"
+                placeholderTextColor="#999"
+                value={nombreValue}
+                onChangeText={setNombreValue}
+                autoCapitalize="words"
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowEditNombreModal(false)}
+              >
+                <ThemedText style={styles.modalButtonCancelText}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  { backgroundColor: tintColor },
+                  (updateUserInfoMutation.isPending || !nombreValue.trim()) && { opacity: 0.5 }
+                ]}
+                onPress={handleSaveNombre}
+                disabled={updateUserInfoMutation.isPending || !nombreValue.trim()}
+              >
+                {updateUserInfoMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.modalButtonSaveText}>Guardar</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para editar documento */}
+      <Modal
+        visible={showEditDocumentoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditDocumentoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>
+                Número de {getDocumentoLabel(documentoType)}
+              </ThemedText>
+              <TouchableOpacity onPress={() => setShowEditDocumentoModal(false)}>
+                <Ionicons name="close" size={24} color={tintColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.modalDescription}>
+              Ingresa tu número de {getDocumentoLabel(documentoType).toLowerCase()}:
+            </ThemedText>
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={[styles.modalInput, { color: useThemeColor({}, 'text') }]}
+                placeholder={`Número de ${getDocumentoLabel(documentoType)}`}
+                placeholderTextColor="#999"
+                value={documentoValue}
+                onChangeText={setDocumentoValue}
+                keyboardType="default"
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowEditDocumentoModal(false)}
+              >
+                <ThemedText style={styles.modalButtonCancelText}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  { backgroundColor: tintColor },
+                  (updateUserInfoMutation.isPending || !documentoValue.trim()) && { opacity: 0.5 }
+                ]}
+                onPress={handleSaveDocumento}
+                disabled={updateUserInfoMutation.isPending || !documentoValue.trim()}
+              >
+                {updateUserInfoMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.modalButtonSaveText}>Guardar</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal 1: Contraseña actual */}
+      <Modal
+        visible={showPasswordModal1}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPasswordModal1(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Cambiar Contraseña</ThemedText>
+              <TouchableOpacity onPress={() => setShowPasswordModal1(false)}>
+                <Ionicons name="close" size={24} color={tintColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.modalDescription}>
+              Ingresa tu contraseña actual:
+            </ThemedText>
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={[styles.modalInput, { color: useThemeColor({}, 'text') }]}
+                placeholder="Contraseña actual"
+                placeholderTextColor="#999"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowPasswordModal1(false)}
+              >
+                <ThemedText style={styles.modalButtonCancelText}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  { backgroundColor: tintColor },
+                  !currentPassword.trim() && { opacity: 0.5 }
+                ]}
+                onPress={handlePasswordStep1}
+                disabled={!currentPassword.trim()}
+              >
+                <ThemedText style={styles.modalButtonSaveText}>Continuar</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal 2: Nueva contraseña */}
+      <Modal
+        visible={showPasswordModal2}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPasswordModal2(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Nueva Contraseña</ThemedText>
+              <TouchableOpacity onPress={() => setShowPasswordModal2(false)}>
+                <Ionicons name="close" size={24} color={tintColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.modalDescription}>
+              Ingresa tu nueva contraseña:{'\n\n'}
+              Debe tener al menos 6 caracteres, incluir una mayúscula, una minúscula y un número.
+            </ThemedText>
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={[styles.modalInput, { color: useThemeColor({}, 'text') }]}
+                placeholder="Nueva contraseña"
+                placeholderTextColor="#999"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowPasswordModal2(false)}
+              >
+                <ThemedText style={styles.modalButtonCancelText}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  { backgroundColor: tintColor },
+                  !newPassword.trim() && { opacity: 0.5 }
+                ]}
+                onPress={handlePasswordStep2}
+                disabled={!newPassword.trim()}
+              >
+                <ThemedText style={styles.modalButtonSaveText}>Continuar</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal 3: Confirmar contraseña */}
+      <Modal
+        visible={showPasswordModal3}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPasswordModal3(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Confirmar Nueva Contraseña</ThemedText>
+              <TouchableOpacity onPress={() => setShowPasswordModal3(false)}>
+                <Ionicons name="close" size={24} color={tintColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.modalDescription}>
+              Confirma tu nueva contraseña:
+            </ThemedText>
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={[styles.modalInput, { color: useThemeColor({}, 'text') }]}
+                placeholder="Confirmar nueva contraseña"
+                placeholderTextColor="#999"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowPasswordModal3(false)}
+              >
+                <ThemedText style={styles.modalButtonCancelText}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  { backgroundColor: tintColor },
+                  (changePasswordMutation.isPending || !confirmPassword.trim()) && { opacity: 0.5 }
+                ]}
+                onPress={handlePasswordStep3}
+                disabled={changePasswordMutation.isPending || !confirmPassword.trim()}
+              >
+                {changePasswordMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.modalButtonSaveText}>Cambiar</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal 1: Nuevo email */}
+      <Modal
+        visible={showEmailModal1}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEmailModal1(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Cambiar Email</ThemedText>
+              <TouchableOpacity onPress={() => setShowEmailModal1(false)}>
+                <Ionicons name="close" size={24} color={tintColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.modalDescription}>
+              Ingresa tu nuevo email:
+            </ThemedText>
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={[styles.modalInput, { color: useThemeColor({}, 'text') }]}
+                placeholder="Nuevo email"
+                placeholderTextColor="#999"
+                value={newEmail}
+                onChangeText={setNewEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowEmailModal1(false)}
+              >
+                <ThemedText style={styles.modalButtonCancelText}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  { backgroundColor: tintColor },
+                  (requestChangeEmailMutation.isPending || !newEmail.trim()) && { opacity: 0.5 }
+                ]}
+                onPress={handleEmailStep1}
+                disabled={requestChangeEmailMutation.isPending || !newEmail.trim()}
+              >
+                {requestChangeEmailMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.modalButtonSaveText}>Continuar</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal 2: Código de verificación */}
+      <Modal
+        visible={showEmailModal2}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEmailModal2(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Código de Verificación</ThemedText>
+              <TouchableOpacity onPress={() => setShowEmailModal2(false)}>
+                <Ionicons name="close" size={24} color={tintColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.modalDescription}>
+              Hemos enviado un código de verificación a tu nuevo email. Ingresa el código:
+            </ThemedText>
+
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={[styles.modalInput, { color: useThemeColor({}, 'text') }]}
+                placeholder="Código de 6 dígitos"
+                placeholderTextColor="#999"
+                value={verificationCode}
+                onChangeText={setVerificationCode}
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowEmailModal2(false)}
+              >
+                <ThemedText style={styles.modalButtonCancelText}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  { backgroundColor: tintColor },
+                  (verifyChangeEmailMutation.isPending || !verificationCode.trim()) && { opacity: 0.5 }
+                ]}
+                onPress={handleEmailStep2}
+                disabled={verifyChangeEmailMutation.isPending || !verificationCode.trim()}
+              >
+                {verifyChangeEmailMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.modalButtonSaveText}>Verificar</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -728,20 +1093,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#F57C00',
     lineHeight: 16,
-  },
-  statsLoadingContainer: {
-    padding: 20,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  statsLoadingText: {
-    fontSize: 14,
-    color: '#666',
   },
   menuContainer: {
     paddingHorizontal: 16,
@@ -889,5 +1240,77 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Estilos para modales
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  modalInputContainer: {
+    marginBottom: 20,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: '#f0f0f0',
+  },
+  modalButtonCancelText: {
+    color: '#666',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  modalButtonSave: {
+    opacity: 1,
+  },
+  modalButtonSaveText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

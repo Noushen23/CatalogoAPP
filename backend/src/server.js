@@ -28,6 +28,7 @@ const deliveryRoutes = require('./routes/delivery');
 const rutasRoutes = require('./routes/rutas');
 // const reportsRoutes = require('./routes/reportsold');
 const repartidoresRoutes = require('./routes/repartidores');
+const pagosRoutes = require('./routes/pagos');
 
 // const { initAdvisorModule } = require('./services/advisorService'); // COMENTADO - MÓDULO DE ASESOR NO EN USO
 const { ensureDeliveryTables } = require('./services/deliveryService');
@@ -160,6 +161,7 @@ app.use('/api/v1/repartidores', repartidoresRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/favorites', favoriteRoutes);
+app.use('/api/v1/pagos', pagosRoutes);
 
 // Rutas de compatibilidad (sin v1)
 app.use('/api/auth', authRoutes);
@@ -180,6 +182,7 @@ app.use('/api/repartidores', repartidoresRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/favorites', favoriteRoutes);
+app.use('/api/pagos', pagosRoutes);
 
 // Ruta raíz de la API
 app.get('/api/v1', (req, res) => {
@@ -198,6 +201,7 @@ app.get('/api/v1', (req, res) => {
       shippingAddresses: '/api/v1/shipping-addresses',
       reviews: '/api/v1/reviews',
       favorites: '/api/v1/favorites',
+      pagos: '/api/v1/pagos',
       health: '/health'
     }
   });

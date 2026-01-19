@@ -71,7 +71,7 @@ const ThemedControlledInput = <T extends FieldValues>({
                 onBlur();
               }}
               onChangeText={onChange}
-              value={value}
+              value={value || ''}
               style={[
                 styles.input,
                 {

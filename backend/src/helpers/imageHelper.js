@@ -49,15 +49,15 @@ class ImageHelper {
     const normalizedPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
     
     // Obtener base URL del servidor (SIEMPRE IP pública)
-    const baseUrl = config.apiBaseUrl || 'http://192.168.3.6:3001';
+    const baseUrl = config.apiBaseUrl || 'http://192.168.3.104:3001';
     
     // Validar que estamos usando IP pública (no local)
     if (baseUrl.includes('192.168.') || baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
       console.warn('⚠️ [ImageHelper.buildImageUrl] ADVERTENCIA: Se está usando IP local en lugar de pública:', baseUrl);
-      console.warn('⚠️ [ImageHelper.buildImageUrl] Forzando uso de IP pública: http://192.168.3.6:3001');
+      console.warn('⚠️ [ImageHelper.buildImageUrl] Forzando uso de IP pública: http://192.168.3.104:3001');
       // Forzar IP pública si detectamos IP local:
       const puerto = baseUrl.split(':').pop() || '3001';
-      return `http://192.168.3.6:${puerto}${normalizedPath}`;
+      return `http://192.168.3.104:${puerto}${normalizedPath}`;
     }
     
     // Construir URL final: baseUrl + ruta normalizada
@@ -68,7 +68,7 @@ class ImageHelper {
       rutaNormalizada: normalizedPath, 
       baseUrl, 
       urlFinal: finalUrl,
-      usandoIPPublica: baseUrl.includes('192.168.3.6')
+      usandoIPPublica: baseUrl.includes('192.168.3.104')
     });
     
     return finalUrl;
@@ -163,7 +163,7 @@ class ImageHelper {
    * @returns {string} URL base
    */
   static getBaseUrl() {
-    return config.apiBaseUrl || config.app.url || 'http://192.168.3.6:3001';
+    return config.apiBaseUrl || config.app.url || 'http://192.168.3.104:3001';
   }
 
   /**

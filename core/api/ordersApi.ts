@@ -18,7 +18,7 @@ export interface OrderItem {
 }
 
 export interface ShippingAddress {
-  id?: number;
+  id?: string; // UUID del backend
   nombreDestinatario: string;
   telefono?: string;
   direccion: string;
@@ -103,6 +103,20 @@ export interface OrderFilters {
   offset?: number;
 }
 
+export interface CalcularCostoEnvioRequest {
+  subtotal: number;
+  direccionEnvioId?: string;
+}
+
+export interface CalcularCostoEnvioResponse {
+  costoEnvio: number;
+  subtotal: number;
+  total: number;
+  zona: string;
+  ciudad: string | null;
+  envioGratis: boolean;
+}
+
 // Servicios de pedidos
 export const ordersApi = {
   // Obtener pedidos del usuario autenticado
@@ -136,6 +150,11 @@ export const ordersApi = {
   // Obtener estadísticas de pedidos del usuario
   async getUserOrderStats(): Promise<ApiResponse<OrderStats>> {
     return await apiClient.get<OrderStats>('/orders/my-stats');
+  },
+
+  // Calcular costo de envío
+  async calcularCostoEnvio(data: CalcularCostoEnvioRequest): Promise<ApiResponse<CalcularCostoEnvioResponse>> {
+    return await apiClient.post<CalcularCostoEnvioResponse>('/orders/calcular-costo-envio', data);
   },
 
   // Obtener todos los pedidos (admin)

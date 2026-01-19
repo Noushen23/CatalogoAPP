@@ -85,6 +85,68 @@ class OrderController {
     }
   }
 
+  // Calcular costo de envío
+  static async calcularCostoEnvio(req, res) {
+    try {
+      const userId = req.user.id;
+      const { subtotal, direccionEnvioId } = req.body;
+
+      if (!subtotal || subtotal < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'El subtotal es requerido y debe ser mayor o igual a 0'
+        });
+      }
+
+      let ciudadEnvio = null;
+      if (direccionEnvioId) {
+        const direccionesSql = `
+          SELECT ciudad 
+          FROM direcciones_envio 
+          WHERE id = ? AND usuario_id = ? AND activa = true
+        `;
+        const direcciones = await query(direccionesSql, [direccionEnvioId, userId]);
+        
+        if (direcciones.length > 0) {
+          ciudadEnvio = direcciones[0].ciudad;
+        }
+      }
+
+      const costoEnvio = Order.calcularCostoEnvio(parseFloat(subtotal), ciudadEnvio);
+      
+      // Determinar zona para información adicional
+      let zona = 'Resto';
+      if (ciudadEnvio) {
+        const ciudadNormalizada = ciudadEnvio.toLowerCase().trim();
+        if (['cúcuta', 'cucuta'].includes(ciudadNormalizada)) {
+          zona = 'Zona Urbana (Cúcuta)';
+        } else if (['el zulia', 'san cayetano', 'villa del rosario', 'villa del rosario de cúcuta'].includes(ciudadNormalizada)) {
+          zona = 'Municipios Cercanos';
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          mensaje: 'El costo de envío se ha calculado exitosamente',
+          costoEnvio,
+          subtotal: parseFloat(subtotal),
+          total: parseFloat(subtotal) + costoEnvio,
+          zona: ciudadEnvio ? zona : 'No especificada',
+          ciudad: ciudadEnvio || null,
+          envioGratis: parseFloat(subtotal) >= 300000
+        }
+      });
+    } catch (error) {
+      console.error('Error al calcular costo de envío:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al calcular el costo de envío',
+        error: error.message
+      });
+    }
+  }
+
   // Crear pedido desde carrito
   static async createOrderFromCart(req, res) {
     try {
@@ -200,13 +262,13 @@ class OrderController {
         });
       }
 
-
-	if (order.referenciaPago){
-		 return res.status(400).json({
-			success: false,
-			message: 'No se puede cancelar un pedido que ya ha sido pagado.'
-			});
-		}
+      // Verificar si el pedido tiene referencia de pago (está pagado)
+      if (order.referenciaPago) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se puede cancelar un pedido que ya ha sido pagado. Contacta al administrador para más información.'
+        });
+      }
 
       // Verificar que el pedido esté en estado 'pendiente' antes de intentar cancelar
       if (order.estado !== 'pendiente') {

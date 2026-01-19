@@ -111,6 +111,11 @@ const LoginScreen = () => {
           </View>
         )}
 
+        {/* Link ¿Olvidaste tu contraseña? */}
+        <View style={{ marginTop: 10, alignItems: 'flex-end' }}>
+          <ThemedLink href="/auth/forgot-password" text="¿Olvidaste tu contraseña?" />
+        </View>
+
         <View style={{ marginTop: 20 }} />
         <ThemedButton
           icon="arrow-forward-outline"
@@ -129,7 +134,7 @@ const LoginScreen = () => {
           }}
         >
           <ThemedText>¿No tienes cuenta?</ThemedText>
-          <ThemedLink href="/auth/register" style={{ marginHorizontal: 5 }} text="Crear cuenta" />
+          <ThemedLink href="/auth/register" style={{ marginHorizontal: 15 }} text="Crear cuenta" />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

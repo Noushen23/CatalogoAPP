@@ -53,17 +53,18 @@ const UserInfoComponent = React.memo<{
   onEditPress?: () => void;
 }>(({ profile, tintColor, onEditPress }) => {
   const userName = useMemo(() => {
-    return profile.usuario?.nombreCompleto || 'Usuario';
-  }, [profile.usuario?.nombreCompleto]);
+    const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+    return fullName || 'Usuario';
+  }, [profile.firstName, profile.lastName]);
 
   const userEmail = useMemo(() => {
-    return profile.usuario?.email || 'email@ejemplo.com';
-  }, [profile.usuario?.email]);
+    return profile.email || 'email@ejemplo.com';
+  }, [profile.email]);
 
   const memberSince = useMemo(() => {
-    if (!profile.usuario?.fechaCreacion) return 'No disponible';
-    return new Date(profile.usuario.fechaCreacion).toLocaleDateString('es-CO');
-  }, [profile.usuario?.fechaCreacion]);
+    if (!profile.createdAt) return 'No disponible';
+    return new Date(profile.createdAt).toLocaleDateString('es-CO');
+  }, [profile.createdAt]);
 
   return (
     <View style={styles.userInfo}>
@@ -121,7 +122,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = React.memo(({ profile
                 },
               ],
               'plain-text',
-              profile.avatarUrl || ''
+              profile.avatar || ''
             );
           },
         },
@@ -134,7 +135,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = React.memo(({ profile
         },
       ]
     );
-  }, [profile.avatarUrl, updateAvatarMutation]);
+  }, [profile.avatar, updateAvatarMutation]);
 
   const handleEditPress = useCallback(() => {
     if (onEditPress) {
@@ -148,8 +149,8 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = React.memo(({ profile
     <ThemedView style={[styles.container, { backgroundColor }]}>
       <View style={styles.header}>
         <AvatarComponent
-          avatarUrl={profile.avatarUrl}
-          userName={profile.usuario?.nombreCompleto}
+          avatarUrl={profile.avatar}
+          userName={`${profile.firstName || ''} ${profile.lastName || ''}`.trim()}
           tintColor={tintColor}
           onPress={handleAvatarPress}
           isUpdating={updateAvatarMutation.isPending}
@@ -161,15 +162,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = React.memo(({ profile
           onEditPress={handleEditPress}
         />
       </View>
-      
-      {profile.usuario?.emailVerificado === false && (
-        <View style={styles.verificationBanner}>
-          <Ionicons name="warning-outline" size={16} color="#FF9800" />
-          <ThemedText style={styles.verificationText}>
-            Verifica tu email para acceder a todas las funcionalidades
-          </ThemedText>
-        </View>
-      )}
     </ThemedView>
   );
 });

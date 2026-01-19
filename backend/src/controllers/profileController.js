@@ -244,46 +244,6 @@ class ProfileController {
     }
   }
 
-  // Obtener estadísticas del perfil
-  static async getProfileStats(req, res) {
-    try {
-      const userId = req.user.id;
-      
-      const profile = await Profile.findByUserId(userId);
-      if (!profile) {
-        return res.status(404).json({
-          success: false,
-          message: 'Perfil no encontrado'
-        });
-      }
-
-      const stats = await profile.getStats();
-      
-      // Obtener estadísticas de favoritos
-      const Favorite = require('../models/Favorite');
-      const favoriteStats = await Favorite.getStats(userId);
-
-      res.json({
-        success: true,
-        message: 'Estadísticas obtenidas exitosamente',
-        data: {
-          totalOrders: stats.total_orders,
-          activeCarts: stats.active_carts,
-          totalSpent: parseFloat(stats.total_spent),
-          memberSince: profile.fechaCreacion,
-          totalFavorites: favoriteStats.total_favoritos
-        }
-      });
-    } catch (error) {
-      console.error('Error al obtener estadísticas del perfil:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor',
-        error: error.message
-      });
-    }
-  }
-
   // Eliminar perfil
   static async deleteProfile(req, res) {
     try {
@@ -399,6 +359,21 @@ class ProfileController {
           success: false,
           message: 'Usuario no encontrado'
         });
+      }
+
+      // Verificar si el documento ya existe en otro usuario (si se está actualizando)
+      if (tipoIdentificacion && numeroIdentificacion) {
+        const existingUserByDocument = await User.findByDocument(
+          tipoIdentificacion,
+          numeroIdentificacion
+        );
+        // Solo validar si existe otro usuario diferente al actual con el mismo documento
+        if (existingUserByDocument && existingUserByDocument.id !== userId) {
+          return res.status(409).json({
+            success: false,
+            message: 'Ya existe otro usuario registrado con este número de documento'
+          });
+        }
       }
 
       const updateData = {};

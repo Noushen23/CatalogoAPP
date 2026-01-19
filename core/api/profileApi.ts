@@ -9,14 +9,25 @@ export interface Profile {
   avatar?: string;
   createdAt: string;
   updatedAt: string;
+  // Propiedades adicionales para información personal
+  fechaNacimiento?: string;
+  genero?: 'masculino' | 'femenino' | 'otro' | 'no_especificar';
+  usuario?: {
+    telefono?: string;
+    direccion?: string;
+    nombreCompleto?: string;
+    email?: string;
+    fechaCreacion?: string;
+    emailVerificado?: boolean;
+  };
 }
 
-export interface ProfileStats {
-  totalOrders: number;
-  totalSpent: number;
-  favoriteProducts: number;
-  totalReviews: number;
-}
+// export interface ProfileStats {
+//   totalOrders: number;
+//   totalSpent: number;
+//   favoriteProducts: number;
+//   totalReviews: number;
+// }
 
 export interface UpdateUserInfoData {
   nombreCompleto?: string;
@@ -52,12 +63,6 @@ export const profileApi = {
     return response.data;
   },
 
-  // Obtener estadísticas del perfil
-  getProfileStats: async (): Promise<ApiResponse<ProfileStats>> => {
-    const response = await apiClient.get('/profile/stats');
-    return response.data;
-  },
-
   // Actualizar información del usuario
   updateProfile: async (data: UpdateUserInfoData): Promise<ApiResponse<Profile>> => {
     const response = await apiClient.put('/profile', data);
@@ -73,6 +78,15 @@ export const profileApi = {
   // Actualizar avatar
   updateAvatar: async (avatar: string): Promise<ApiResponse<Profile>> => {
     const response = await apiClient.put('/profile/avatar', { avatar });
+    return response.data;
+  },
+
+  // Actualizar información personal (fecha de nacimiento, género)
+  updatePersonalInfo: async (data: {
+    fechaNacimiento?: string;
+    genero?: 'masculino' | 'femenino' | 'otro' | 'no_especificar';
+  }): Promise<ApiResponse<Profile>> => {
+    const response = await apiClient.put('/profile/personal-info', data);
     return response.data;
   },
 

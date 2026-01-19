@@ -4,7 +4,6 @@ import { Alert } from 'react-native';
 import { 
   profileApi, 
   Profile, 
-  ProfileStats, 
   UpdateUserInfoData, 
   NotificationPreferences, 
   PrivacySettings 
@@ -17,16 +16,11 @@ const CACHE_TIMES = {
     staleTime: 2 * 60 * 1000, // 2 minutos (reducido de 5)
     gcTime: 10 * 60 * 1000, // 10 minutos para mantener en caché
   },
-  STATS: { 
-    staleTime: 5 * 60 * 1000, // 5 minutos (reducido de 10)
-    gcTime: 15 * 60 * 1000, // 15 minutos para mantener en caché
-  },
 } as const;
 
 // Query keys centralizados
 export const PROFILE_QUERY_KEYS = {
   PROFILE: ['profile'] as const,
-  STATS: ['profile', 'stats'] as const,
 } as const;
 
 // Hook para obtener perfil con optimizaciones
@@ -45,25 +39,6 @@ export const useProfile = () => {
     ...CACHE_TIMES.PROFILE,
     retry: 1, // Reducido de 3 a 1 para carga más rápida
     retryDelay: 500, // Delay fijo más corto
-  });
-};
-
-// Hook para obtener estadísticas del perfil
-export const useProfileStats = () => {
-  return useQuery({
-    queryKey: PROFILE_QUERY_KEYS.STATS,
-    queryFn: async () => {
-      const response = await profileApi.getProfileStats();
-      
-      if (!response.success || !response.data) {
-        throw new Error(response.message || 'Error al cargar estadísticas');
-      }
-      
-      return response.data;
-    },
-    ...CACHE_TIMES.STATS,
-    retry: 0, // Sin reintentos para stats (no es crítico)
-    refetchOnMount: false, // No recargar en cada mount
   });
 };
 
@@ -250,7 +225,6 @@ export const useInvalidateProfile = () => {
 
   return useCallback(() => {
     queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEYS.PROFILE });
-    queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEYS.STATS });
   }, [queryClient]);
 };
 
@@ -373,17 +347,15 @@ export const useVerifyChangeEmail = () => {
   return mutation;
 };
 
-// Hook para obtener datos combinados del perfil (optimizado)
+// Hook para obtener datos del perfil (optimizado)
 export const useProfileData = () => {
   const profileQuery = useProfile();
-  const statsQuery = useProfileStats();
 
   return useMemo(() => ({
     profile: profileQuery.data,
-    stats: statsQuery.data,
-    isLoading: profileQuery.isLoading || statsQuery.isLoading,
-    isError: profileQuery.isError || statsQuery.isError,
-    error: profileQuery.error || statsQuery.error,
-    refetch: () => Promise.all([profileQuery.refetch(), statsQuery.refetch()]),
-  }), [profileQuery, statsQuery]);
+    isLoading: profileQuery.isLoading,
+    isError: profileQuery.isError,
+    error: profileQuery.error,
+    refetch: () => profileQuery.refetch(),
+  }), [profileQuery]);
 };

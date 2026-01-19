@@ -76,8 +76,8 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
     );
   };
 
-  // Solo se puede cancelar si el pedido está en estado 'pendiente'
-  const canCancelOrder = order.estado === 'pendiente';
+  // Solo se puede cancelar si el pedido está en estado 'pendiente' y no está pagado
+  const canCancelOrder = order.estado === 'pendiente' && !order.referenciaPago;
   
   // Usar utilidades centralizadas para los estados
   const statusColor = getOrderStatusColor(order.estado);
