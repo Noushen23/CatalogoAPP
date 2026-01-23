@@ -114,7 +114,7 @@ export interface OrderItem {
 }
 
 export type OrderStatus = AdminOrder['estado'];
-export type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'pse';
+export type PaymentMethod = 'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer';
 
 interface ApiResponse<T> {
   success: boolean;

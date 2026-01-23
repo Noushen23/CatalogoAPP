@@ -14,7 +14,7 @@ import { ThemedView } from '@/presentation/theme/components/ThemedView';
 import { ThemedText } from '@/presentation/theme/components/ThemedText';
 import { useThemeColor } from '@/presentation/theme/hooks/useThemeColor';
 import { useUserOrder } from '@/presentation/orders/hooks/useOrders';
-import { Order } from '@/core/api/ordersApi';
+import { Order, OrderItem } from '@/core/api/ordersApi';
 import { formatDateTime, formatCurrency } from '@/presentation/utils';
 import { getOrderStatusColor, getOrderStatusText, getOrderStatusIcon } from '@/presentation/orders/utils';
 
@@ -23,8 +23,18 @@ export default function OrderConfirmationScreen() {
   const tintColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
 
-  // Usar el hook para cargar el pedido
-  const { data: order, isLoading, error } = useUserOrder(id || '');
+  // Usar el hook para cargar el pedido con refetch automático si está pendiente
+  const { data: order, isLoading, error, refetch } = useUserOrder(id || '', {
+    // Si el pedido está pendiente, refetch cada 3 segundos para verificar si el pago se procesó
+    refetchInterval: (query) => {
+      const orderData = query.state.data as Order | undefined;
+      // Refetch automático solo si el pedido está pendiente (esperando pago)
+      if (orderData?.estado === 'pendiente') {
+        return 3000; // 3 segundos
+      }
+      return false; // No refetch si el pedido ya tiene otro estado
+    },
+  });
 
   if (isLoading) {
     return (
@@ -77,6 +87,9 @@ export default function OrderConfirmationScreen() {
     );
   }
 
+  // TypeScript ahora sabe que order es de tipo Order
+  const orderData = order as Order;
+
   return (
     <ThemedView style={styles.container}>
       {/* Header */}
@@ -98,30 +111,59 @@ export default function OrderConfirmationScreen() {
         {/* Estado del Pedido */}
         <View style={styles.section}>
           <View style={styles.statusContainer}>
-            <View style={[styles.statusIcon, { backgroundColor: getOrderStatusColor(order.estado) + '20' }]}>
+            <View style={[styles.statusIcon, { backgroundColor: getOrderStatusColor(orderData.estado) + '20' }]}>
               <Ionicons 
-                name={getOrderStatusIcon(order.estado) as any} 
+                name={getOrderStatusIcon(orderData.estado) as any} 
                 size={32} 
-                color={getOrderStatusColor(order.estado)} 
+                color={getOrderStatusColor(orderData.estado)} 
               />
             </View>
             
             <View style={styles.statusInfo}>
               <ThemedText style={styles.statusTitle}>
-                ¡Pedido {getOrderStatusText(order.estado)}!
+                ¡Pedido {getOrderStatusText(orderData.estado)}!
               </ThemedText>
               <ThemedText style={styles.statusSubtitle}>
-                Número de orden: {order.numeroOrden}
+                Número de orden: {orderData.numeroOrden}
               </ThemedText>
             </View>
           </View>
 
-          <View style={styles.successMessage}>
-            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-            <ThemedText style={styles.successText}>
-              Tu pedido ha sido procesado exitosamente. Te enviaremos una confirmación por correo electrónico.
-            </ThemedText>
-          </View>
+          {/* Mensaje según el estado del pedido */}
+          {orderData.estado === 'pendiente' ? (
+            <View style={styles.pendingMessage}>
+              <Ionicons name="time-outline" size={24} color="#FF9800" />
+              <View style={styles.pendingTextContainer}>
+                <ThemedText style={styles.pendingText}>
+                  Esperando confirmación de pago...
+                </ThemedText>
+                <ThemedText style={styles.pendingSubtext}>
+                  Estamos verificando tu pago. Esta página se actualizará automáticamente cuando se confirme.
+                </ThemedText>
+              </View>
+            </View>
+          ) : orderData.estado === 'confirmada' || orderData.estado === 'en_proceso' || orderData.estado === 'enviada' || orderData.estado === 'entregada' ? (
+            <View style={styles.successMessage}>
+              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+              <ThemedText style={styles.successText}>
+                Tu pedido ha sido procesado exitosamente. Te enviaremos una confirmación por correo electrónico.
+              </ThemedText>
+            </View>
+          ) : orderData.estado === 'cancelada' ? (
+            <View style={styles.errorMessage}>
+              <Ionicons name="close-circle-outline" size={24} color="#F44336" />
+              <ThemedText style={styles.errorMessageText}>
+                Tu pedido ha sido cancelado.
+              </ThemedText>
+            </View>
+          ) : orderData.estado === 'reembolsada' ? (
+            <View style={styles.infoMessage}>
+              <Ionicons name="refresh-outline" size={24} color="#607D8B" />
+              <ThemedText style={styles.infoMessageText}>
+                Tu pedido ha sido reembolsado.
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
 
         {/* Información del Pedido */}
@@ -132,15 +174,15 @@ export default function OrderConfirmationScreen() {
             <View style={styles.infoItem}>
               <ThemedText style={styles.infoLabel}>Fecha de Pedido</ThemedText>
               <ThemedText style={styles.infoValue}>
-                {formatDateTime(order.fechaCreacion)}
+                {formatDateTime(orderData.fechaCreacion)}
               </ThemedText>
             </View>
 
             <View style={styles.infoItem}>
               <ThemedText style={styles.infoLabel}>Estado</ThemedText>
               <View style={styles.statusBadge}>
-                <ThemedText style={[styles.statusBadgeText, { color: getOrderStatusColor(order.estado) }]}>
-                  {getOrderStatusText(order.estado)}
+                <ThemedText style={[styles.statusBadgeText, { color: getOrderStatusColor(orderData.estado) }]}>
+                  {getOrderStatusText(orderData.estado)}
                 </ThemedText>
               </View>
             </View>
@@ -148,15 +190,19 @@ export default function OrderConfirmationScreen() {
             <View style={styles.infoItem}>
               <ThemedText style={styles.infoLabel}>Método de Pago</ThemedText>
               <ThemedText style={styles.infoValue}>
-                {order.metodoPago ? order.metodoPago.charAt(0).toUpperCase() + order.metodoPago.slice(1) : 'No especificado'}
+                {orderData.metodoPago === 'tarjeta' ? 'Tarjeta' :
+                 orderData.metodoPago === 'pse' ? 'PSE' :
+                 orderData.metodoPago === 'nequi' ? 'Nequi' :
+                 orderData.metodoPago === 'bancolombia_transfer' ? 'Bancolombia' :
+                 orderData.metodoPago ? orderData.metodoPago.charAt(0).toUpperCase() + orderData.metodoPago.slice(1).replace('_', ' ') : 'No especificado'}
               </ThemedText>
             </View>
 
-            {order.referenciaPago && (
+            {orderData.referenciaPago && (
               <View style={styles.infoItem}>
                 <ThemedText style={styles.infoLabel}>Referencia de Pago</ThemedText>
                 <ThemedText style={styles.infoValue}>
-                  {order.referenciaPago}
+                  {orderData.referenciaPago}
                 </ThemedText>
               </View>
             )}
@@ -164,7 +210,7 @@ export default function OrderConfirmationScreen() {
         </View>
 
         {/* Dirección de Envío */}
-        {order.direccionEnvio && (
+        {orderData.direccionEnvio && (
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Dirección de Envío</ThemedText>
             
@@ -172,22 +218,22 @@ export default function OrderConfirmationScreen() {
               <View style={styles.addressHeader}>
                 <Ionicons name="location-outline" size={20} color={tintColor} />
                 <ThemedText style={styles.addressName}>
-                  {order.direccionEnvio.nombreDestinatario}
+                  {orderData.direccionEnvio.nombreDestinatario}
                 </ThemedText>
               </View>
               
               <ThemedText style={styles.addressText}>
-                {order.direccionEnvio.direccion}
+                {orderData.direccionEnvio.direccion}
               </ThemedText>
               <ThemedText style={styles.addressText}>
-                {order.direccionEnvio.ciudad}, {order.direccionEnvio.departamento}
+                {orderData.direccionEnvio.ciudad}, {orderData.direccionEnvio.departamento}
               </ThemedText>
               
-              {order.direccionEnvio.telefono && (
+              {orderData.direccionEnvio.telefono && (
                 <View style={styles.phoneContainer}>
                   <Ionicons name="call-outline" size={16} color="#666" />
                   <ThemedText style={styles.phoneText}>
-                    {order.direccionEnvio.telefono}
+                    {orderData.direccionEnvio.telefono}
                   </ThemedText>
                 </View>
               )}
@@ -197,10 +243,10 @@ export default function OrderConfirmationScreen() {
 
         {/* Productos del Pedido */}
         <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Productos ({order.items.length})</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Productos ({orderData.items.length})</ThemedText>
           
           <View style={styles.productsContainer}>
-            {order.items.map((item, index) => (
+            {orderData.items.map((item: OrderItem, index: number) => (
               <TouchableOpacity
                 key={item.id || index}
                 style={styles.productItem}
@@ -246,15 +292,15 @@ export default function OrderConfirmationScreen() {
             <View style={styles.costRow}>
               <ThemedText style={styles.costLabel}>Subtotal</ThemedText>
               <ThemedText style={styles.costValue}>
-                {formatCurrency(order.subtotal || 0)}
+                {formatCurrency(orderData.subtotal || 0)}
               </ThemedText>
             </View>
 
-            {(order.descuento || 0) > 0 && (
+            {(orderData.descuento || 0) > 0 && (
               <View style={styles.costRow}>
                 <ThemedText style={styles.costLabel}>Descuento</ThemedText>
                 <ThemedText style={[styles.costValue, styles.discountValue]}>
-                  -{formatCurrency(order.descuento || 0)}
+                  -{formatCurrency(orderData.descuento || 0)}
                 </ThemedText>
               </View>
             )}
@@ -262,15 +308,15 @@ export default function OrderConfirmationScreen() {
             <View style={styles.costRow}>
               <ThemedText style={styles.costLabel}>Envío</ThemedText>
               <ThemedText style={styles.costValue}>
-                {formatCurrency(order.costoEnvio || 0)}
+                {formatCurrency(orderData.costoEnvio || 0)}
               </ThemedText>
             </View>
 
-            {(order.impuestos || 0) > 0 && (
+            {(orderData.impuestos || 0) > 0 && (
               <View style={styles.costRow}>
                 <ThemedText style={styles.costLabel}>Impuestos</ThemedText>
                 <ThemedText style={styles.costValue}>
-                  {formatCurrency(order.impuestos || 0)}
+                  {formatCurrency(orderData.impuestos || 0)}
                 </ThemedText>
               </View>
             )}
@@ -278,18 +324,18 @@ export default function OrderConfirmationScreen() {
             <View style={[styles.costRow, styles.totalRow]}>
               <ThemedText style={styles.totalLabel}>Total</ThemedText>
               <ThemedText style={styles.totalValue}>
-                {formatCurrency(order.total || 0)}
+                {formatCurrency(orderData.total || 0)}
               </ThemedText>
             </View>
           </View>
         </View>
 
         {/* Notas */}
-        {order.notas && (
+        {orderData.notas && (
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Notas</ThemedText>
             <ThemedText style={styles.notesText}>
-              {order.notas}
+              {orderData.notas}
             </ThemedText>
           </View>
         )}
@@ -471,6 +517,57 @@ const styles = StyleSheet.create({
   successText: {
     fontSize: 14,
     color: '#2E7D32',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
+  },
+  pendingMessage: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    borderRadius: 8,
+  },
+  pendingTextContainer: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  pendingText: {
+    fontSize: 14,
+    color: '#E65100',
+    fontWeight: '600',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  pendingSubtext: {
+    fontSize: 12,
+    color: '#F57C00',
+    lineHeight: 18,
+  },
+  errorMessage: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFEBEE',
+    padding: 12,
+    borderRadius: 8,
+  },
+  errorMessageText: {
+    fontSize: 14,
+    color: '#C62828',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
+  },
+  infoMessage: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ECEFF1',
+    padding: 12,
+    borderRadius: 8,
+  },
+  infoMessageText: {
+    fontSize: 14,
+    color: '#37474F',
     marginLeft: 8,
     flex: 1,
     lineHeight: 20,

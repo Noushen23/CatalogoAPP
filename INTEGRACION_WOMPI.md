@@ -27,7 +27,11 @@ Se ha integrado exitosamente Wompi como pasarela de pagos en el sistema de e-com
    - `GET /api/v1/pagos/bancos-pse` - Obtener bancos PSE
    - `GET /api/v1/pagos/configuracion` - Configuración pública
 
-4. **Configuración** (`backend/src/config/env.js`)
+4. **Rutas de Redirección** (`backend/src/controllers/pagoRedirectController.js`)
+   - `GET /pago-exitoso` - Página de redirección después de pago exitoso (pública)
+   - `GET /pago-error` - Página de redirección después de error en pago (pública)
+
+5. **Configuración** (`backend/src/config/env.js`)
    - Variables de entorno en español
    - Configuración de ambiente (pruebas/producción)
    - URLs de redirección
@@ -82,10 +86,98 @@ WOMPI_URL_REDIRECCION_ERROR=http://tu-dominio.com/pago-error
 
 - ✅ **Tarjeta de Crédito/Débito** (CARD)
 - ✅ **PSE** (Pagos Seguros en Línea)
-- ✅ **Nequi** (preparado, requiere configuración adicional)
-- ✅ **Transferencia Bancolombia** (preparado, requiere configuración adicional)
+- ✅ **Nequi** (implementado)
+- ✅ **Transferencia Bancolombia** (implementado)
 - ✅ **Efectivo** (no requiere Wompi)
 - ✅ **Transferencia** (no requiere Wompi)
+
+### 📱 Números de Prueba para Sandbox
+
+#### Nequi
+- `3991111111` → Transacción **APROBADA** (APPROVED)
+- `3992222222` → Transacción **DECLINADA** (DECLINED)
+- Cualquier otro número → **ERROR**
+
+#### PSE
+- `financial_institution_code: "1"` → Transacción **APROBADA** (APPROVED)
+- `financial_institution_code: "2"` → Transacción **DECLINADA** (DECLINED)
+
+#### Bancolombia
+- No requiere números especiales en Sandbox
+- Después de crear la transacción, usar `async_payment_url` para redirigir al usuario
+
+## 🔔 Webhooks y Eventos
+
+### Estructura del Webhook
+
+Wompi envía webhooks con la siguiente estructura:
+
+```json
+{
+  "event": "transaction.updated",
+  "data": {
+    "transaction": {
+      "id": "1234-1610641025-49201",
+      "amount_in_cents": 4490000,
+      "reference": "MZQ3X2DE2SMX",
+      "customer_email": "juan.perez@gmail.com",
+      "currency": "COP",
+      "payment_method_type": "NEQUI",
+      "status": "APPROVED",
+      "redirect_url": "https://mitienda.com.co/pagos/redireccion",
+      "shipping_address": null,
+      "payment_link_id": null,
+      "payment_source_id": null
+    }
+  },
+  "environment": "prod",
+  "signature": {
+    "properties": [
+      "transaction.id",
+      "transaction.status",
+      "transaction.amount_in_cents"
+    ],
+    "checksum": "3476DDA50F64CD7CBD160689640506FEBEA93239BC524FC0469B2C68A3CC8BD0"
+  },
+  "timestamp": 1530291411,
+  "sent_at": "2018-07-20T16:45:05.000Z"
+}
+```
+
+### Tipos de Eventos
+
+- `transaction.updated` - El estado de una transacción cambió (APPROVED, VOIDED, DECLINED, ERROR)
+- `nequi_token.updated` - El estado de un token de Nequi cambió
+- `bancolombia_transfer_token.updated` - El estado de un token de Bancolombia cambió
+
+### Validación de Firma
+
+La firma se valida siguiendo el algoritmo oficial de Wompi:
+
+1. **Paso 1**: Concatenar los valores de `signature.properties` en orden
+   - Ejemplo: `"1234-1610641025-49201APPROVED4490000"`
+
+2. **Paso 2**: Concatenar el `timestamp` (número entero)
+   - Ejemplo: `"1234-1610641025-49201APPROVED44900001530291411"`
+
+3. **Paso 3**: Concatenar el **Secreto de Eventos** (`WOMPI_CLAVE_INTEGRIDAD`)
+   - ⚠️ **IMPORTANTE**: El "Secreto de Eventos" es diferente a la Llave Privada y Llave Pública
+   - Se encuentra en: Dashboard > Mi cuenta > Secretos para integración técnica
+   - Ejemplo: `"1234-1610641025-49201APPROVED44900001530291411prod_events_..."`
+
+4. **Paso 4**: Aplicar SHA256 al string concatenado
+   - Resultado: `SHA256(cadena_concatenada).toUpperCase()`
+
+La firma puede venir en:
+- Header HTTP: `X-Event-Checksum`
+- Body: `signature.checksum`
+
+### Configuración de URL de Eventos
+
+- **Sandbox**: Configura una URL diferente para pruebas
+- **Producción**: Configura una URL diferente para producción
+- **Requisitos**: HTTPS, método POST, responder con HTTP 200
+- **Reintentos**: Wompi reintentará hasta 3 veces si no recibe HTTP 200
 
 ## 📁 Estructura de Archivos
 
@@ -129,9 +221,14 @@ frontend/
 1. **Configurar credenciales de Wompi** en el archivo `.env`
 2. **Configurar webhook** en el panel de Wompi:
    - URL: `https://tu-dominio.com/api/v1/pagos/webhook`
-3. **Probar en ambiente de pruebas** con tarjetas de prueba
-4. **Implementar widget de Wompi** en frontend para pagos con tarjeta (opcional)
-5. **Configurar URLs de redirección** según tu dominio
+3. **Configurar URLs de redirección** en el archivo `.env`:
+   - `WOMPI_URL_REDIRECCION`: URL HTTP/HTTPS válida (ej: `https://tu-ngrok.ngrok-free.dev/pago-exitoso`)
+   - `WOMPI_URL_REDIRECCION_ERROR`: URL HTTP/HTTPS válida (ej: `https://tu-ngrok.ngrok-free.dev/pago-error`)
+4. **Rutas de redirección creadas**:
+   - `GET /pago-exitoso` - Página HTML que intenta abrir la app móvil después de un pago exitoso
+   - `GET /pago-error` - Página HTML que intenta abrir la app móvil después de un error en el pago
+5. **Probar en ambiente de pruebas** con tarjetas de prueba
+6. **Implementar widget de Wompi** en frontend para pagos con tarjeta (opcional)
 
 ## 📚 Documentación Adicional
 

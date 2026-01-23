@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { pagosApi, CrearTransaccionRequest, Transaccion, BancoPSE, ConfiguracionWompi } from '@/core/api/pagosApi';
+import { pagosApi, CrearTransaccionRequest, Transaccion, ConfiguracionWompi } from '@/core/api/pagosApi';
 
 // Query keys para pagos
 export const PAGOS_QUERY_KEY = ['pagos'] as const;
@@ -56,42 +56,10 @@ export const useConsultarTransaccion = (idTransaccion: string | null) => {
         throw new Error('ID de transacción es requerido');
       }
       
-      const response = await pagosApi.consultarTransaccion(idTransaccion);
-      
-      if (!response.success) {
-        throw new Error(response.message || 'Error al consultar la transacción');
-      }
-      
-      return response.data;
+      throw new Error('Consultar transacción no aplica para Web Checkout. Usa el webhook como fuente de verdad.');
     },
     enabled: !!idTransaccion,
-    refetchInterval: (data) => {
-      // Si la transacción está pendiente, refetch cada 5 segundos
-      if (data?.estado === 'PENDING') {
-        return 5000;
-      }
-      // Si está aprobada o rechazada, no refetch
-      return false;
-    }
-  });
-};
-
-/**
- * Hook para obtener lista de bancos PSE
- */
-export const useBancosPSE = () => {
-  return useQuery({
-    queryKey: [...PAGOS_QUERY_KEY, 'bancos-pse'],
-    queryFn: async () => {
-      const response = await pagosApi.obtenerBancosPSE();
-      
-      if (!response.success) {
-        throw new Error(response.message || 'Error al obtener bancos PSE');
-      }
-      
-      return response.data?.bancos || [];
-    },
-    staleTime: 1000 * 60 * 60, // Cache por 1 hora (los bancos no cambian frecuentemente)
+    refetchInterval: false
   });
 };
 

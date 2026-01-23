@@ -203,10 +203,10 @@ export default function OrdersKanban() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Todos</option>
-                  <option value="efectivo">Efectivo</option>
                   <option value="tarjeta">Tarjeta</option>
-                  <option value="transferencia">Transferencia</option>
                   <option value="pse">PSE</option>
+                  <option value="nequi">Nequi</option>
+                  <option value="bancolombia_transfer">Bancolombia</option>
                 </select>
               </div>
 

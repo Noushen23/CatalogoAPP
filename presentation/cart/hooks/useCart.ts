@@ -7,13 +7,27 @@ export const useCart = () => {
   return useQuery({
     queryKey: ['cart'],
     queryFn: async () => {
-      const response = await cartApi.getCart();
-      
-      if (!response.success) {
-        throw new Error(response.message);
+      try {
+        const response = await cartApi.getCart();
+        
+        if (!response.success) {
+          throw new Error(response.message);
+        }
+        
+        return response.data;
+      } catch (error: any) {
+        // Si el error es "Carrito vacío" o "Carrito no encontrado", devolver un carrito vacío
+        if (error.message === 'Carrito vacío' || error.message === 'Carrito no encontrado') {
+          return {
+            id: '',
+            items: [],
+            totalItems: 0,
+            total: 0,
+            isEmpty: true
+          };
+        }
+        throw error;
       }
-      
-      return response.data;
     },
     staleTime: CACHE_TIMES.FIVE_MINUTES,
     retry: 1,
@@ -25,13 +39,26 @@ export const useCartSummary = () => {
   return useQuery({
     queryKey: ['cart', 'summary'],
     queryFn: async () => {
-      const response = await cartApi.getCartSummary();
-      
-      if (!response.success) {
-        throw new Error(response.message);
+      try {
+        const response = await cartApi.getCartSummary();
+        
+        if (!response.success) {
+          throw new Error(response.message);
+        }
+        
+        return response.data;
+      } catch (error: any) {
+        // Si el error es "Carrito vacío" o "Carrito no encontrado", devolver un resumen vacío
+        if (error.message === 'Carrito vacío' || error.message === 'Carrito no encontrado') {
+          return {
+            totalItems: 0,
+            total: 0,
+            isEmpty: true,
+            itemCount: 0
+          };
+        }
+        throw error;
       }
-      
-      return response.data;
     },
     staleTime: CACHE_TIMES.FIVE_MINUTES,
     retry: 1,

@@ -13,18 +13,6 @@ Crea un archivo `.env` en la raíz del proyecto con el siguiente contenido:
 # CONFIGURACIÓN GLOBAL DEL PROYECTO
 # ============================================
 
-# IP Pública del Servidor
-API_PUBLIC_IP=192.168.1.106
-API_PORT=3001
-
-# URL Base de la API
-API_BASE_URL=http://192.168.1.106:3001
-API_URL=http://192.168.1.106:3001/api/v1
-
-# Configuración del Backend
-NODE_ENV=development
-PORT=3001
-APP_URL=http://192.168.1.106:3001
 
 # Base de Datos MySQL
 DB_HOST=localhost
@@ -57,6 +45,28 @@ TERCERO_API_TOKEN=angeldavidcapa2025
 MAPS_PROVIDER=google
 GOOGLE_MAPS_API_KEY=
 MAPBOX_ACCESS_TOKEN=
+
+# Wompi - Pasarela de Pagos
+WOMPI_URL_BASE=https://production.wompi.co/v1
+WOMPI_URL_BASE_PRUEBAS=https://sandbox.wompi.co/v1
+WOMPI_CLAVE_PUBLICA=pub_test_xxxxxxxxxxxxx
+WOMPI_CLAVE_PRIVADA=prv_test_xxxxxxxxxxxxx
+# IMPORTANTE: El "Secreto de Eventos" es diferente a la Llave Privada y Llave Pública
+# Se encuentra en: Dashboard de Wompi > Mi cuenta > Secretos para integración técnica
+# Este secreto se usa SOLO para validar la firma de los webhooks/eventos
+WOMPI_CLAVE_INTEGRIDAD=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+WOMPI_AMBIENTE=pruebas
+WOMPI_MONEDA=COP
+# URLs de redirección (DEBEN ser HTTPS válidas, NO deep links, NO localhost)
+# 🚨 IMPORTANTE: Wompi NO permite localhost en Web Checkout, especialmente en mobile
+# Para desarrollo, DEBES usar ngrok o una URL pública HTTPS
+# Opción 1: Configurar URLs completas
+WOMPI_URL_REDIRECCION=https://calvous-unbolstered-dodie.ngrok-free.dev/pago-exitoso
+WOMPI_URL_REDIRECCION_ERROR=https://calvous-unbolstered-dodie.ngrok-free.dev/pago-error
+# Opción 2: Configurar solo la URL base de ngrok (el sistema agregará /pago-exitoso y /pago-error)
+WOMPI_NGROK_URL=https://calvous-unbolstered-dodie.ngrok-free.dev
+# O usar NGROK_URL (alias)
+# NGROK_URL=https://calvous-unbolstered-dodie.ngrok-free.dev
 ```
 
 ### 2. Archivo `.env` en `admin-web/` (Next.js)
@@ -69,8 +79,6 @@ Crea un archivo `.env` en la carpeta `admin-web/` con el siguiente contenido:
 # Next.js - Variables de entorno públicas
 # ============================================
 
-# URL Base de la API (pública para Next.js)
-NEXT_PUBLIC_API_URL=http://192.168.1.106:3001/api/v1
 
 # API de Materiales
 NEXT_PUBLIC_APIMATERIAL_URL=http://localhost:51250
@@ -84,13 +92,6 @@ NODE_ENV=development
 
 Las variables de entorno para la app móvil están configuradas en `app.json` en la sección `extra`:
 
-```json
-"extra": {
-  "EXPO_PUBLIC_API_URL": "http://192.168.1.106:3001/api/v1",
-  "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.106:3001",
-  "EXPO_PUBLIC_STAGE": "production"
-}
-```
 
 ## 🚀 Cómo Cambiar la IP Pública
 

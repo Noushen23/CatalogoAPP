@@ -31,7 +31,7 @@ export const useUserOrders = (filters: OrderFilters = {}) => {
       
       return {
         ...response.data,
-        nextPage: response.data.orders.length === (filters.limit || 20) ? pageParam + 1 : undefined
+        nextPage: response.data?.orders.length === (filters.limit || 20) ? pageParam + 1 : undefined
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
@@ -62,7 +62,9 @@ export const useUserOrdersSimple = (filters: OrderFilters = {}) => {
 };
 
 // Hook para obtener pedido específico del usuario
-export const useUserOrder = (orderId: string) => {
+export const useUserOrder = (orderId: string, options?: {
+  refetchInterval?: number | ((query: any) => number | false);
+}) => {
   return useQuery({
     queryKey: [...ORDERS_QUERY_KEY, 'user', orderId],
     queryFn: async () => {
@@ -80,11 +82,12 @@ export const useUserOrder = (orderId: string) => {
     },
     enabled: !!orderId,
     staleTime: 0, // Siempre considerar los datos como obsoletos para obtener el estado más reciente
-    cacheTime: 1000 * 60 * 5, // Mantener en cache por 5 minutos pero siempre refetchear
+    gcTime: 1000 * 60 * 5, // Mantener en cache por 5 minutos pero siempre refetchear
     retry: 1,
     refetchOnWindowFocus: true, // Refetch cuando la ventana vuelve a estar en foco
     refetchOnMount: true, // Refetch al montar el componente - importante para ver estado actualizado
     refetchOnReconnect: true, // Refetch al reconectar
+    refetchInterval: options?.refetchInterval, // Refetch automático opcional
   });
 };
 

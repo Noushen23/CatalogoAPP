@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { body, param, query } = require('express-validator');
-const OrderController = require('../controllers/orderController');
+const OrderUserController = require('../controllers/order/orderUserController');
+const OrderAdminController = require('../controllers/order/orderAdminController');
+const OrderStatsController = require('../controllers/order/orderStatsController');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 
@@ -13,8 +15,8 @@ const validateCreateOrder = [
     .withMessage('ID de dirección de envío inválido'),
   body('metodoPago')
     .optional()
-    .isIn(['efectivo', 'tarjeta', 'transferencia', 'pse'])
-    .withMessage('Método de pago inválido'),
+    .isIn(['tarjeta', 'pse', 'nequi', 'bancolombia_transfer'])
+    .withMessage('Método de pago inválido. Solo se permiten métodos de pago de Wompi'),
   body('referenciaPago')
     .optional()
     .isLength({ max: 100 })
@@ -65,8 +67,8 @@ const validateCreateOrderFromCart = [
     .withMessage('ID de dirección de envío inválido'),
   body('metodoPago')
     .optional()
-    .isIn(['efectivo', 'tarjeta', 'transferencia', 'pse'])
-    .withMessage('Método de pago inválido'),
+    .isIn(['tarjeta', 'pse', 'nequi', 'bancolombia_transfer'])
+    .withMessage('Método de pago inválido. Solo se permiten métodos de pago de Wompi'),
   body('referenciaPago')
     .optional()
     .isLength({ max: 100 })
@@ -115,36 +117,36 @@ const validatePagination = [
 router.use(authenticateToken);
 
 // Obtener pedidos del usuario autenticado
-router.get('/my-orders', validatePagination, OrderController.getUserOrders);
+router.get('/my-orders', validatePagination, OrderUserController.getUserOrders);
 
 // Obtener estadísticas de pedidos del usuario
-router.get('/my-stats', OrderController.getUserOrderStats);
+router.get('/my-stats', OrderStatsController.getUserOrderStats);
 
 // Obtener pedido específico del usuario
-router.get('/my-orders/:id', validateOrderId, OrderController.getUserOrder);
+router.get('/my-orders/:id', validateOrderId, OrderUserController.getUserOrder);
 
 // Calcular costo de envío
-router.post('/calcular-costo-envio', OrderController.calcularCostoEnvio);
+router.post('/calcular-costo-envio', OrderUserController.calcularCostoEnvio);
 
 // Crear pedido desde carrito
-router.post('/create-from-cart', validateCreateOrderFromCart, handleValidationErrors, OrderController.createOrderFromCart);
+router.post('/create-from-cart', validateCreateOrderFromCart, handleValidationErrors, OrderUserController.createOrderFromCart);
 
 // Cancelar pedido del usuario
-router.put('/my-orders/:id/cancel', validateCancelOrder, handleValidationErrors, OrderController.cancelUserOrder);
+router.put('/my-orders/:id/cancel', validateCancelOrder, handleValidationErrors, OrderUserController.cancelUserOrder);
 
 // Rutas de administrador
 router.use(authorize('admin'));
 
 // Obtener todos los pedidos (admin)
-router.get('/', validatePagination, OrderController.getAllOrders);
+router.get('/', validatePagination, OrderAdminController.getAllOrders);
 
 // Obtener estadísticas generales (admin)
-router.get('/stats', OrderController.getOrderStats);
+router.get('/stats', OrderStatsController.getOrderStats);
 
 // Obtener pedido específico (admin) - debe ir antes de /:id/status
-router.get('/:id', validateOrderId, OrderController.getOrderById);
+router.get('/:id', validateOrderId, OrderAdminController.getOrderById);
 
 // Actualizar estado de pedido (admin)
-router.put('/:id/status', validateUpdateOrderStatus, handleValidationErrors, OrderController.updateOrderStatus);
+router.put('/:id/status', validateUpdateOrderStatus, handleValidationErrors, OrderAdminController.updateOrderStatus);
 
 module.exports = router;

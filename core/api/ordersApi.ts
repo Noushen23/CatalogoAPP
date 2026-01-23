@@ -76,14 +76,14 @@ export interface OrderStats {
 
 export interface CreateOrderRequest {
   direccionEnvioId?: string;
-  metodoPago?: 'efectivo' | 'tarjeta' | 'transferencia' | 'pse';
+  metodoPago?: 'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer';
   referenciaPago?: string;
   notas?: string;
 }
 
 export interface CreateOrderFromCartRequest {
   direccionEnvioId?: string;
-  metodoPago?: 'efectivo' | 'tarjeta' | 'transferencia' | 'pse';
+  metodoPago?: 'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer';
   referenciaPago?: string;
   notas?: string;
 }

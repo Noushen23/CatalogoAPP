@@ -91,6 +91,11 @@ export default function EditShippingAddressScreen() {
     if (!telefono.trim()) {
       return 'El teléfono es requerido';
     }
+    // Validar que el teléfono tenga al menos 10 dígitos
+    const phoneDigits = telefono.replace(/\D/g, ''); // Remover caracteres no numéricos
+    if (phoneDigits.length < 10) {
+      return 'El teléfono debe tener al menos 10 números';
+    }
     if (!addressData) {
       return 'Debes seleccionar una ubicación';
     }

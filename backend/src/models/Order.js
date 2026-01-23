@@ -433,7 +433,7 @@ class Order {
   }
 
   // Cancelar pedido
-  async cancel(reason = null) {
+  async cancel(reason = null, restaurarStock = true) {
     // Verificar si el pedido ya está cancelado
     if (this.estado === 'cancelada') {
       throw new Error('El pedido ya está cancelado');
@@ -445,14 +445,32 @@ class Order {
     }
     
     // Verificar si el pedido tiene referencia de pago (está pagado)
-    if (this.referenciaPago) {
-      throw new Error('No se puede cancelar un pedido que ya ha sido pagado. Contacta al administrador para más información.');
+    // PERMITIR cancelar si el pago fue rechazado (no tiene referencia válida o el pago falló)
+    if (this.referenciaPago && this.estado === 'confirmada') {
+      throw new Error('No se puede cancelar un pedido que ya ha sido pagado y confirmado. Contacta al administrador para más información.');
     }
     
-    // Solo se puede cancelar si el pedido está en estado 'pendiente' y no está pagado
-    if (this.estado !== 'pendiente') {
-      // Para cualquier otro estado (confirmada, en_proceso, enviada, etc.)
-      throw new Error('Solo se pueden cancelar pedidos que están en estado pendiente');
+    // Solo se puede cancelar si el pedido está en estado 'pendiente' o si el pago falló
+    if (this.estado !== 'pendiente' && this.estado !== 'confirmada') {
+      // Para cualquier otro estado (en_proceso, enviada, etc.)
+      throw new Error('Solo se pueden cancelar pedidos que están en estado pendiente o confirmada (si el pago falló)');
+    }
+
+    // Obtener items del pedido para restaurar stock
+    const items = await Order.getOrderItems(this.id);
+    
+    // Restaurar stock de los productos si se solicita
+    if (restaurarStock && items && items.length > 0) {
+      for (const item of items) {
+        const restoreStockSql = `
+          UPDATE productos 
+          SET stock = stock + ?, fecha_actualizacion = NOW()
+          WHERE id = ?
+        `;
+        await query(restoreStockSql, [item.cantidad, item.productId]);
+        console.log(`✅ [Order] Stock restaurado para producto ${item.productId}: +${item.cantidad}`);
+      }
+      console.log(`✅ [Order] Stock restaurado para ${items.length} producto(s) del pedido ${this.id}`);
     }
 
     const sql = `
@@ -469,6 +487,8 @@ class Order {
     this.estado = 'cancelada';
     this.notas = newNotes;
     this.fechaActualizacion = new Date();
+    
+    console.log(`✅ [Order] Pedido ${this.id} cancelado${restaurarStock ? ' y stock restaurado' : ''}`);
     
     return this;
   }

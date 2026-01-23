@@ -59,10 +59,10 @@ const estadosLabels: Record<string, string> = {
 
 // Mapeo de métodos de pago
 const metodoPagoLabels: Record<string, string> = {
-  efectivo: 'Efectivo',
   tarjeta: 'Tarjeta',
-  transferencia: 'Transferencia',
   pse: 'PSE',
+  nequi: 'Nequi',
+  bancolombia_transfer: 'Bancolombia',
 };
 
 /**

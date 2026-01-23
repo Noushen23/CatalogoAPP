@@ -29,6 +29,7 @@ const rutasRoutes = require('./routes/rutas');
 // const reportsRoutes = require('./routes/reportsold');
 const repartidoresRoutes = require('./routes/repartidores');
 const pagosRoutes = require('./routes/pagos');
+const pagoRedirectController = require('./controllers/pagoRedirectController');
 
 // const { initAdvisorModule } = require('./services/advisorService'); // COMENTADO - MÓDULO DE ASESOR NO EN USO
 const { ensureDeliveryTables } = require('./services/deliveryService');
@@ -102,6 +103,11 @@ app.get('/health', (req, res) => {
     version: config.app.version
   });
 });
+
+// Rutas públicas de redirección de pagos (antes de las rutas de API)
+// Estas rutas son públicas y no requieren autenticación
+app.get('/pago-exitoso', pagoRedirectController.pagoExitoso);
+app.get('/pago-error', pagoRedirectController.pagoError);
 
 // Ruta de prueba para verificar imágenes
 app.get('/test-images', (req, res) => {
@@ -248,6 +254,8 @@ const startServer = async () => {
     // Iniciar worker de notificaciones
     const notificationWorker = require('./workers/notificationWorker');
     notificationWorker.start();
+
+    // Iniciar worker de timeout de pagos
 
     const server = app.listen(config.port, '0.0.0.0', () => {
       console.log('🚀 Servidor iniciado');

@@ -56,6 +56,7 @@ class ShippingAddressController {
           departamento: address.departamento,
           codigoPostal: address.codigo_postal,
           pais: address.pais,
+          instrucciones: address.instrucciones,
           esPrincipal: address.es_principal,
           activa: address.activa,
           fechaCreacion: address.fecha_creacion,
@@ -107,6 +108,7 @@ class ShippingAddressController {
           departamento: address.departamento,
           codigoPostal: address.codigo_postal,
           pais: address.pais,
+          instrucciones: address.instrucciones,
           esPrincipal: address.es_principal,
           activa: address.activa,
           fechaCreacion: address.fecha_creacion,
@@ -159,6 +161,7 @@ class ShippingAddressController {
           departamento: address.departamento,
           codigoPostal: address.codigo_postal,
           pais: address.pais,
+          instrucciones: address.instrucciones,
           esPrincipal: address.es_principal,
           activa: address.activa,
           fechaCreacion: address.fecha_creacion,
@@ -187,7 +190,8 @@ class ShippingAddressController {
         departamento,
         codigoPostal,
         pais = 'Colombia',
-        esPrincipal = false
+        esPrincipal = false,
+        instrucciones
       } = req.body;
 
       // Normalizar ciudad para almacenamiento
@@ -217,8 +221,8 @@ class ShippingAddressController {
       const sql = `
         INSERT INTO direcciones_envio (
           id, usuario_id, nombre_destinatario, telefono, direccion, 
-          ciudad, departamento, codigo_postal, pais, es_principal, activa
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+          ciudad, departamento, codigo_postal, pais, instrucciones, es_principal, activa
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
       `;
 
       await query(sql, [
@@ -231,6 +235,7 @@ class ShippingAddressController {
         departamentoNormalizado,  // Usar departamento normalizado
         codigoPostal || null,
         pais,
+        instrucciones || null,
         esPrincipal
       ]);
 
@@ -258,6 +263,7 @@ class ShippingAddressController {
           departamento: address.departamento,
           codigoPostal: address.codigo_postal,
           pais: address.pais,
+          instrucciones: address.instrucciones,
           esPrincipal: address.es_principal,
           activa: address.activa,
           fechaCreacion: address.fecha_creacion,
@@ -345,6 +351,10 @@ class ShippingAddressController {
               updateFields.push('pais = ?');
               updateValues.push(updateData[key]);
               break;
+            case 'instrucciones':
+              updateFields.push('instrucciones = ?');
+              updateValues.push(updateData[key] || null);
+              break;
             case 'esPrincipal':
               updateFields.push('es_principal = ?');
               updateValues.push(updateData[key]);
@@ -388,6 +398,7 @@ class ShippingAddressController {
           departamento: address.departamento,
           codigoPostal: address.codigo_postal,
           pais: address.pais,
+          instrucciones: address.instrucciones,
           esPrincipal: address.es_principal,
           activa: address.activa,
           fechaCreacion: address.fecha_creacion,
@@ -490,6 +501,7 @@ class ShippingAddressController {
           departamento: address.departamento,
           codigoPostal: address.codigo_postal,
           pais: address.pais,
+          instrucciones: address.instrucciones,
           esPrincipal: address.es_principal,
           activa: address.activa,
           fechaCreacion: address.fecha_creacion,

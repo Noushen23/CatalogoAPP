@@ -89,19 +89,24 @@ class ApiClient {
         return response;
       },
       async (error) => {
-
+        // Ignorar errores 404 del carrito cuando no existe (es normal si el usuario no tiene carrito)
+        const errorUrl = error.config?.url || '';
+        const isCartEndpoint = errorUrl.includes('/cart') && !errorUrl.includes('/cart/history');
+        const isCartNotFound = error.response?.status === 404 && 
+                               error.response?.data?.message === 'Carrito no encontrado';
+        
+        if (isCartEndpoint && isCartNotFound) {
+          // No loggear como error crítico, solo como warning
+          console.warn('⚠️ Carrito no encontrado (esto es normal si el usuario no tiene carrito activo)');
+          // Devolver un error más amigable
+          return Promise.reject(new Error('Carrito vacío'));
+        }
 
 	  // Log detallado del error
-        console.error('❌ API Error:', {
-          message: error.message,
-          code: error.code,
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          url: error.config?.url,
-          baseURL: error.config?.baseURL,
-          fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'N/A',
-          data: error.response?.data,
-        });
+        console.error(
+          '❌ API Error:',
+          JSON.stringify(error.response?.data, null, 2)
+        );
 
         if (error.response?.status === 401) {
           const errorUrl = error.config?.url || '';

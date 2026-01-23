@@ -521,6 +521,274 @@ class EmailService {
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Crear template HTML para email de actualización de estado de pedido
+   */
+  createOrderStatusUpdateEmailTemplate(nombre, numeroOrden, estado, estadoAnterior, total, fechaCreacion) {
+    const statusMessages = {
+      'pendiente': {
+        title: '⏳ Pedido en Proceso',
+        message: 'Tu pedido está siendo procesado. Te notificaremos cuando sea confirmado.',
+        color: '#ff9800'
+      },
+      'confirmada': {
+        title: '✅ Pedido Confirmado',
+        message: 'Tu pedido ha sido confirmado y está siendo preparado.',
+        color: '#4caf50'
+      },
+      'en_proceso': {
+        title: '🔄 Pedido en Preparación',
+        message: 'Tu pedido está siendo preparado para su envío.',
+        color: '#2196f3'
+      },
+      'enviada': {
+        title: '📦 Pedido Enviado',
+        message: '¡Tu pedido ha sido enviado! Está en camino a la dirección de entrega.',
+        color: '#9c27b0'
+      },
+      'entregada': {
+        title: '🎉 Pedido Entregado',
+        message: '¡Tu pedido ha sido entregado exitosamente! Esperamos que disfrutes tus productos.',
+        color: '#4caf50'
+      },
+      'cancelada': {
+        title: '❌ Pedido Cancelado',
+        message: 'Tu pedido ha sido cancelado. Si tienes alguna pregunta, contáctanos.',
+        color: '#f44336'
+      },
+      'reembolsada': {
+        title: '💰 Pedido Reembolsado',
+        message: 'Tu pedido ha sido reembolsado. El reembolso se procesará según tus datos de pago.',
+        color: '#2196f3'
+      }
+    };
+
+    const statusInfo = statusMessages[estado] || {
+      title: '📋 Estado Actualizado',
+      message: 'El estado de tu pedido ha sido actualizado.',
+      color: '#667eea'
+    };
+
+    const statusLabels = {
+      'pendiente': 'Pendiente',
+      'confirmada': 'Confirmada',
+      'en_proceso': 'En Proceso',
+      'enviada': 'Enviada',
+      'entregada': 'Entregada',
+      'cancelada': 'Cancelada',
+      'reembolsada': 'Reembolsada'
+    };
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Actualización de Pedido</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+            padding: 20px;
+          }
+          .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, ${statusInfo.color} 0%, ${statusInfo.color}dd 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+          }
+          .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+          }
+          .header p {
+            font-size: 16px;
+            opacity: 0.9;
+          }
+          .content {
+            padding: 40px 30px;
+          }
+          .greeting {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+          }
+          .order-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid ${statusInfo.color};
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+          }
+          .order-info h2 {
+            color: ${statusInfo.color};
+            margin-bottom: 10px;
+            font-size: 20px;
+          }
+          .order-details {
+            margin-top: 15px;
+          }
+          .order-details p {
+            margin: 8px 0;
+            color: #666;
+          }
+          .order-details strong {
+            color: #333;
+          }
+          .status-badge {
+            display: inline-block;
+            background-color: ${statusInfo.color};
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 10px;
+          }
+          .message {
+            font-size: 16px;
+            color: #666;
+            margin: 25px 0;
+            line-height: 1.8;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+          }
+          .footer p {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+          }
+          .footer a {
+            color: #667eea;
+            text-decoration: none;
+          }
+          @media only screen and (max-width: 600px) {
+            .content {
+              padding: 30px 20px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>${statusInfo.title}</h1>
+            <p>Actualización de Pedido #${numeroOrden}</p>
+          </div>
+          
+          <div class="content">
+            <p class="greeting">¡Hola ${nombre}!</p>
+            
+            <p class="message">
+              ${statusInfo.message}
+            </p>
+
+            <div class="order-info">
+              <h2>📦 Detalles del Pedido</h2>
+              <div class="order-details">
+                <p><strong>Número de Pedido:</strong> #${numeroOrden}</p>
+                <p><strong>Estado Anterior:</strong> ${statusLabels[estadoAnterior] || estadoAnterior}</p>
+                <p><strong>Nuevo Estado:</strong> <span class="status-badge">${statusLabels[estado] || estado}</span></p>
+                <p><strong>Total:</strong> $${total ? total.toLocaleString('es-CO') : 'N/A'}</p>
+                <p><strong>Fecha de Creación:</strong> ${fechaCreacion ? new Date(fechaCreacion).toLocaleString('es-CO') : 'N/A'}</p>
+              </div>
+            </div>
+            
+            <p class="message">
+              Puedes consultar el estado de tu pedido en cualquier momento desde tu cuenta en la aplicación.
+            </p>
+          </div>
+          
+          <div class="footer">
+            <p>
+              Este es un correo automático, por favor no respondas a este mensaje.
+            </p>
+            <p>
+              Si tienes alguna pregunta sobre tu pedido, contáctanos en 
+              <a href="mailto:${config.email.supportEmail}">
+                ${config.email.supportEmail}
+              </a>
+            </p>
+            <p style="margin-top: 20px; color: #999; font-size: 12px;">
+              © ${new Date().getFullYear()} ${config.app.name}. Todos los derechos reservados.
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Enviar email de actualización de estado de pedido
+   */
+  async sendOrderStatusUpdateEmail(email, nombre, numeroOrden, estado, estadoAnterior, total, fechaCreacion) {
+    try {
+      // En modo desarrollo sin configuración SMTP, simular envío
+      if (!this.transporter) {
+        console.log('📧 [SIMULACIÓN] Email de actualización de estado de pedido para:', email);
+        console.log('📧 [SIMULACIÓN] Pedido:', numeroOrden);
+        console.log('📧 [SIMULACIÓN] Estado:', estadoAnterior, '→', estado);
+        return {
+          success: true,
+          message: 'Email simulado (modo desarrollo)',
+          messageId: 'simulated-' + Date.now(),
+        };
+      }
+
+      const mailOptions = {
+        from: `"${config.app.name}" <${config.email.from}>`,
+        to: email,
+        subject: `Actualización de Pedido #${numeroOrden} - ${config.app.name}`,
+        html: this.createOrderStatusUpdateEmailTemplate(
+          nombre,
+          numeroOrden,
+          estado,
+          estadoAnterior,
+          total,
+          fechaCreacion
+        ),
+        text: `Hola ${nombre},\n\nEl estado de tu pedido #${numeroOrden} ha sido actualizado.\n\nEstado anterior: ${estadoAnterior}\nNuevo estado: ${estado}\n\nTotal: $${total ? total.toLocaleString('es-CO') : 'N/A'}\n\nPuedes consultar el estado de tu pedido en cualquier momento desde tu cuenta.\n\nSaludos,\nEl equipo de ${config.app.name}`,
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('✅ Email de actualización de estado de pedido enviado:', info.messageId);
+
+      return {
+        success: true,
+        message: 'Email enviado correctamente',
+        messageId: info.messageId,
+      };
+    } catch (error) {
+      console.error('❌ Error al enviar email de actualización de estado de pedido:', error);
+      return {
+        success: false,
+        message: 'Error al enviar el email',
+        error: error.message,
+      };
+    }
+  }
 }
 
 // Exportar instancia única del servicio

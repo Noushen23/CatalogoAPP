@@ -47,10 +47,10 @@ const statusLabels = {
 };
 
 const paymentMethodLabels = {
-  efectivo: "Efectivo",
   tarjeta: "Tarjeta",
-  transferencia: "Transferencia",
   pse: "PSE",
+  nequi: "Nequi",
+  bancolombia_transfer: "Bancolombia",
 };
 
 // ===== FUNCIONES REUTILIZABLES PARA REDUCIR DUPLICACIÓN =====

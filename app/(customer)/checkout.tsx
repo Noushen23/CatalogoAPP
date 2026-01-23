@@ -9,9 +9,11 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 
 import { ThemedView } from '@/presentation/theme/components/ThemedView';
 import { ThemedText } from '@/presentation/theme/components/ThemedText';
@@ -24,16 +26,23 @@ import { useShippingAddresses } from '@/presentation/shipping/hooks/useShippingA
 import { ShippingAddressSelector } from '@/presentation/shipping/components/ShippingAddressSelector';
 import { useLocation, AddressData } from '@/presentation/location/hooks/useLocation';
 import { LocationSelector } from '@/presentation/location/components/LocationSelector';
-import { useCreateOrderFromCart } from '@/presentation/orders/hooks/useOrders';
+// import { useCreateOrderFromCart, useCancelUserOrder } from '@/presentation/orders/hooks/useOrders';
 import { CreateOrderFromCartRequest, ordersApi } from '@/core/api/ordersApi';
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { formatCurrency } from '@/presentation/utils';
 import { useCrearTransaccion } from '@/presentation/pagos/hooks/usePagos';
+import { PSEDataForm } from '@/presentation/pagos/components/PSEDataForm';
+import { NequiDataForm } from '@/presentation/pagos/components/NequiDataForm';
+import { BancolombiaDataForm } from '@/presentation/pagos/components/BancolombiaDataForm';
+import { DatosPSE, DatosNequi, DatosBancolombia } from '@/core/api/pagosApi';
 
 export default function CheckoutScreen() {
   // El ID de la dirección seleccionada se guardará aquí
   const [seleccionadaDireccionId, setSeleccionadaDireccionId] = useState<string | undefined>(undefined);
-  const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia' | 'pse'>('efectivo');
+  const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer'>('tarjeta');
+  const [pseData, setPseData] = useState<DatosPSE | null>(null);
+  const [nequiData, setNequiData] = useState<DatosNequi | null>(null);
+  const [bancolombiaData, setBancolombiaData] = useState<DatosBancolombia | null>(null);
   const [notes, setNotes] = useState('');
   const [direccionCost, setDireccionCost] = useState(0);
   const [direccionZona, setDireccionZona] = useState<string | null>(null);
@@ -52,10 +61,8 @@ export default function CheckoutScreen() {
 
   const clearCartMutation = useClearCart();
   
-  // Hook para crear pedido
-  const createOrderMutation = useCreateOrderFromCart();
-  
   // Hook para crear transacción de pago con Wompi
+  // NOTA: El pedido se creará automáticamente cuando el pago sea aprobado (vía webhook)
   const crearTransaccionMutation = useCrearTransaccion();
 
   // Hook para obtener ubicación GPS
@@ -154,120 +161,64 @@ export default function CheckoutScreen() {
     }
 
     try {
-      // Métodos de pago que requieren integración con Wompi
-      const metodosWompi = ['tarjeta', 'pse'];
-      const requiereWompi = metodosWompi.includes(paymentMethod);
-
-      // Crear pedido primero
-      const orderData: CreateOrderFromCartRequest = {
+      // Todos los métodos de pago requieren integración con Wompi
+      // NO crear pedido antes del pago - el pedido se creará cuando el pago sea aprobado
+      // Crear transacción directamente con los datos del carrito
+      const transaccionData: any = {
+        metodoPago: paymentMethod as 'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer',
         direccionEnvioId: seleccionadaDireccionId,
-        metodoPago: paymentMethod,
-        // No asignar referenciaPago todavía si es pago con Wompi (se asignará después)
-        referenciaPago: requiereWompi ? undefined : `REF-${Date.now()}`,
         notas: notes.trim() || undefined,
       };
 
-      const orderResult = await createOrderMutation.mutateAsync(orderData);
-
-      if (!orderResult || !orderResult.id) {
-        throw new Error('No se recibieron datos del pedido creado');
+      // Agregar datos opcionales de los formularios para pre-llenar información en el Web Checkout
+      if (paymentMethod === 'pse' && pseData) {
+        transaccionData.datosPSE = pseData;
       }
 
-      // Si el método de pago requiere Wompi, crear la transacción
-      if (requiereWompi) {
+      if (paymentMethod === 'nequi' && nequiData) {
+        transaccionData.datosNequi = nequiData;
+      }
+
+      if (paymentMethod === 'bancolombia_transfer' && bancolombiaData) {
+        transaccionData.datosBancolombia = bancolombiaData;
+      }
+
+      const transaccionResult = await crearTransaccionMutation.mutateAsync(transaccionData);
+
+      if (transaccionResult && transaccionResult.urlCheckout) {
+        // Guardar URL en SecureStore como respaldo (por si la URL es muy larga para los parámetros)
         try {
-          // Crear transacción de pago con Wompi
-          const transaccionData = {
-            pedidoId: orderResult.id,
-            metodoPago: paymentMethod as 'tarjeta' | 'pse',
-            // Para tarjeta, el token se obtiene del frontend (Wompi Widget)
-            // Para PSE, se necesitan datos bancarios
-            // Por ahora, creamos la transacción y Wompi manejará el flujo
-          };
-
-          const transaccionResult = await crearTransaccionMutation.mutateAsync(transaccionData);
-
-          if (transaccionResult && transaccionResult.urlRedireccion) {
-            // Redirigir a la URL de pago de Wompi
-            // En React Native, esto se puede hacer con Linking
-            const { Linking } = require('react-native');
-            const canOpen = await Linking.canOpenURL(transaccionResult.urlRedireccion);
-            
-            if (canOpen) {
-              Alert.alert(
-                'Redirigiendo a Wompi',
-                'Serás redirigido a la pasarela de pagos para completar tu compra.',
-                [
-                  {
-                    text: 'Continuar',
-                    onPress: async () => {
-                      await Linking.openURL(transaccionResult.urlRedireccion!);
-                      // Después del pago, Wompi redirigirá de vuelta a la app
-                      // El webhook actualizará el estado del pedido
-                    }
-                  }
-                ]
-              );
-            } else {
-              // Si no se puede abrir la URL, mostrar información
-              Alert.alert(
-                'Pago Pendiente',
-                `Tu pedido ${orderResult.numeroOrden} ha sido creado. Por favor, completa el pago usando la siguiente URL:\n\n${transaccionResult.urlRedireccion}`,
-                [
-                  {
-                    text: 'Ver Pedido',
-                    onPress: () => {
-                      router.replace(`/(customer)/order-confirmation/${orderResult.id}` as any);
-                    }
-                  }
-                ]
-              );
-            }
-          } else {
-            throw new Error('No se recibió URL de redirección de Wompi');
-          }
-        } catch (errorPago) {
-          console.error('Error al crear transacción de pago:', errorPago);
-          // El pedido ya fue creado, pero el pago falló
-          Alert.alert(
-            'Pedido Creado - Pago Pendiente',
-            `Tu pedido ${orderResult.numeroOrden} ha sido creado, pero hubo un error al procesar el pago. Puedes intentar pagar más tarde desde el detalle del pedido.`,
-            [
-              {
-                text: 'Ver Pedido',
-                onPress: () => {
-                  router.replace(`/(customer)/order-confirmation/${orderResult.id}` as any);
-                }
-              }
-            ]
-          );
+          await SecureStore.setItemAsync('wompi_checkout_url', transaccionResult.urlCheckout);
+        } catch (storeError) {
+          console.warn('⚠️ [Checkout] No se pudo guardar URL en SecureStore:', storeError);
+          // Continuar de todas formas, la URL se pasará como parámetro
         }
-      } else {
-        // Para métodos de pago que no requieren Wompi (efectivo, transferencia)
-        Alert.alert(
-          '¡Pedido Creado Exitosamente!',
-          `Tu pedido ${orderResult.numeroOrden} ha sido procesado correctamente.`,
-          [
-            {
-              text: 'Ver Pedido',
-              onPress: () => {
-                router.replace(`/(customer)/order-confirmation/${orderResult.id}` as any);
-              }
-            },
-            {
-              text: 'Continuar Comprando',
-              onPress: () => router.push('/(customer)/catalog')
-            }
-          ]
-        );
-      }
 
+        console.log('🔍 [Checkout] URL recibida del backend:', {
+          urlLength: transaccionResult.urlCheckout.length,
+          urlPrefix: transaccionResult.urlCheckout.substring(0, 200),
+          hasSignature: transaccionResult.urlCheckout.includes('signature:integrity'),
+          isWompiDomain: transaccionResult.urlCheckout.includes('checkout.wompi.co'),
+          transaccionId: transaccionResult.transaccionId
+        });
+        
+        // Navegar a la pantalla de checkout de Wompi
+        router.push({
+          pathname: '/(customer)/wompi-checkout',
+          params: {
+            transaccionId: transaccionResult.transaccionId,
+            urlCheckout: transaccionResult.urlCheckout,
+          },
+        });
+      } else {
+        throw new Error('No se recibió URL de checkout de Wompi');
+      }
     } catch (error) {
-      console.error('Error en handleConfirmOrder:', error);
+      console.error('❌ Error al crear transacción de pago:', error);
       
-      const errorMessage = error instanceof Error ? error.message : 'Error al crear el pedido';
+      const errorMessage = error instanceof Error ? error.message : 'Error al procesar el pago';
       Alert.alert(
-        'Error al Crear Pedido',
+        'Error al Procesar Pago',
         errorMessage,
         [{ text: 'Entendido' }]
       );
@@ -315,7 +266,7 @@ export default function CheckoutScreen() {
   const total = subtotal + direccionCost;
 
   // Estado de procesamiento
-  const isProcessing = createOrderMutation.isPending || crearTransaccionMutation.isPending;
+  const isProcessing = crearTransaccionMutation.isPending;
 
   return (
     <ThemedView style={styles.container}>
@@ -425,10 +376,10 @@ export default function CheckoutScreen() {
             
             <View style={styles.paymentMethods}>
               {[
-                { key: 'efectivo', label: 'Efectivo', icon: 'cash-outline' },
                 { key: 'tarjeta', label: 'Tarjeta', icon: 'card-outline' },
-                { key: 'transferencia', label: 'Transferencia', icon: 'swap-horizontal-outline' },
                 { key: 'pse', label: 'PSE', icon: 'phone-portrait-outline' },
+                { key: 'nequi', label: 'Nequi', icon: 'wallet-outline' },
+                { key: 'bancolombia_transfer', label: 'Bancolombia', icon: 'swap-horizontal-outline' },
               ].map((method) => (
                 <TouchableOpacity
                   key={method.key}
@@ -454,6 +405,49 @@ export default function CheckoutScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Formulario de datos PSE */}
+            {paymentMethod === 'pse' && (
+              <View style={styles.pseFormContainer}>
+                <PSEDataForm
+                  onDataSelected={(data) => {
+                    setPseData({
+                      tipoIdentificacion: data.tipoIdentificacion,
+                      numeroIdentificacion: data.numeroIdentificacion,
+                    });
+                  }}
+                  userNumeroIdentificacion={undefined}
+                  userTipoIdentificacion={undefined}
+                />
+              </View>
+            )}
+
+            {/* Formulario de datos Nequi */}
+            {paymentMethod === 'nequi' && (
+              <View style={styles.pseFormContainer}>
+                <NequiDataForm
+                  onDataSelected={(data) => {
+                    setNequiData({
+                      telefono: data.telefono,
+                    });
+                  }}
+                  userTelefono={user?.telefono}
+                />
+              </View>
+            )}
+
+            {/* Formulario de datos Bancolombia */}
+            {paymentMethod === 'bancolombia_transfer' && (
+              <View style={styles.pseFormContainer}>
+                <BancolombiaDataForm
+                  onDataSelected={(data) => {
+                    setBancolombiaData({
+                      descripcionPago: data.descripcionPago,
+                    });
+                  }}
+                />
+              </View>
+            )}
           </View>
 
           {/* Notas Adicionales */}
@@ -688,6 +682,12 @@ const styles = StyleSheet.create({
   paymentMethodLabel: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  pseFormContainer: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
     color: '#666',
     marginLeft: 8,
   },

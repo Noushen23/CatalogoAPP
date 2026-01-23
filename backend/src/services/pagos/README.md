@@ -73,7 +73,32 @@ const resultado = await wompiService.crearTransaccion({
   metodoPago: {
     tipo: 'CARD', // 'CARD', 'PSE', 'NEQUI', 'BANCOLOMBIA_TRANSFER'
     tokenTarjeta: 'tok_test_xxxxx', // Solo para tarjeta
+    telefono: '3991111111', // Solo para Nequi (en Sandbox: 3991111111=APPROVED, 3992222222=DECLINED)
     cuotas: 1
+  },
+  urlRedireccion: 'https://tu-app.com/pago-exitoso',
+  urlRedireccionError: 'https://tu-app.com/pago-error'
+});
+
+// Ejemplo con PSE
+const resultadoPSE = await wompiService.crearTransaccion({
+  referencia: 'PED-12345-1234567890',
+  monto: 100000,
+  moneda: 'COP',
+  cliente: {
+    email: 'cliente@example.com',
+    nombre: 'Juan Pérez',
+    telefono: '+573001234567',
+    tipoIdentificacion: 'CC',
+    numeroIdentificacion: '1999888777'
+  },
+  metodoPago: {
+    tipo: 'PSE',
+    banco: '1', // financial_institution_code (en Sandbox: "1"=APPROVED, "2"=DECLINED)
+    tipoPersona: 0, // 0 = Natural, 1 = Jurídica
+    tipoIdentificacion: 'CC', // 'CC' o 'NIT'
+    numeroIdentificacion: '1999888777',
+    descripcionPago: 'Pago de pedido #12345' // Máximo 30 caracteres
   },
   urlRedireccion: 'https://tu-app.com/pago-exitoso',
   urlRedireccionError: 'https://tu-app.com/pago-error'
@@ -97,15 +122,29 @@ El webhook se procesa automáticamente en la ruta `/api/v1/pagos/webhook`. El co
    - Soporta cuotas
 
 2. **PSE (Pagos Seguros en Línea)**
-   - Requiere banco y tipo de persona
+   - Requiere `financial_institution_code` (código del banco)
+   - Requiere `user_type`: 0 = Natural (persona), 1 = Jurídica (empresa)
+   - Requiere `user_legal_id` (número de identificación)
+   - Requiere `user_legal_id_type`: 'CC' o 'NIT'
+   - Requiere `payment_description` (máximo 30 caracteres)
+   - **Ambiente Sandbox (Pruebas):**
+     - `financial_institution_code: "1"` = Transacción aprobada (APPROVED)
+     - `financial_institution_code: "2"` = Transacción declinada (DECLINED)
    - Redirige al banco para completar el pago
 
 3. **Nequi**
    - Pago desde la app de Nequi
-   - Requiere número de teléfono
+   - Requiere número de teléfono en el campo `phone_number` del `payment_method`
+   - **Ambiente Sandbox (Pruebas):**
+     - `3991111111` = Transacción aprobada (APPROVED)
+     - `3992222222` = Transacción declinada (DECLINED)
+     - Cualquier otro número = ERROR
 
-4. **Transferencia Bancolombia**
+4. **Transferencia Bancolombia (BANCOLOMBIA_TRANSFER)**
    - Transferencia directa desde cuenta Bancolombia
+   - Requiere `payment_description` (máximo 64 caracteres)
+   - Después de crear la transacción, se obtiene `async_payment_url` en la respuesta
+   - Esta URL debe usarse para redirigir al usuario a la autenticación de Bancolombia
 
 ## Estados de Transacción
 
