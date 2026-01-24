@@ -264,16 +264,16 @@ class PagoController {
         numeroIdentificacion: usuario.numero_identificacion
       };
       
-      // Guardar transacción pendiente en tabla temporal
-      const transaccionPendienteSql = `
-        INSERT INTO transacciones_pendientes (
+      // Guardar intención de checkout en tabla temporal
+      const checkoutIntentSql = `
+        INSERT INTO checkout_intents (
           id, referencia_pago, usuario_id, carrito_id, direccion_envio_id,
           metodo_pago, notas, datos_carrito, datos_usuario, datos_envio,
           estado_transaccion, fecha_creacion, fecha_actualizacion
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW(), NOW())
       `;
       
-      await query(transaccionPendienteSql, [
+      await query(checkoutIntentSql, [
         transaccionId,
         referencia,
         userId,
@@ -286,8 +286,8 @@ class PagoController {
         datosEnvio ? JSON.stringify(datosEnvio) : null
       ]);
       
-      console.log('✅ [Pago] Transacción pendiente guardada en tabla temporal:', {
-        transaccionId,
+      console.log('✅ [Pago] Intención de checkout guardada:', {
+        checkoutIntentId: transaccionId,
         referencia,
         usuarioId: userId,
         carritoId: cart.id
@@ -487,87 +487,55 @@ class PagoController {
         });
       }
 
-      // Buscar transacción pendiente por referencia
+      // Buscar intención de checkout por referencia
       const referencia = resultado.datos.referencia;
-      const transaccionSql = `
-        SELECT id, usuario_id, carrito_id, direccion_envio_id, metodo_pago, notas,
-               datos_carrito, datos_usuario, datos_envio, estado_transaccion
-        FROM transacciones_pendientes
-        WHERE referencia_pago = ?
-      `;
-      const transacciones = await query(transaccionSql, [referencia]);
+      const OrderService = require('../services/orderService');
+      const checkoutIntent = await OrderService.getCheckoutIntentByReference(referencia);
 
-      if (transacciones.length === 0) {
-        console.warn('⚠️ [Pago] Transacción pendiente no encontrada para referencia:', referencia);
+      if (!checkoutIntent) {
+        console.warn('⚠️ [Pago] Intención de checkout no encontrada para referencia:', referencia);
         // Responder 200 para que Wompi no reintente
         return res.json({
           success: true,
-          message: 'Webhook procesado (transacción no encontrada)'
+          message: 'Webhook procesado (intención de checkout no encontrada)'
         });
       }
 
-      const transaccion = transacciones[0];
       const estadoTransaccion = resultado.datos.estado;
       const evento = resultado.evento;
       const idTransaccionWompi = resultado.datos.idTransaccion;
       
-      // Actualizar estado de la transacción pendiente
-      const actualizarTransaccionSql = `
-        UPDATE transacciones_pendientes
-        SET estado_transaccion = ?,
-            id_transaccion_wompi = ?,
-            fecha_actualizacion = NOW()
-        WHERE id = ?
-      `;
-      await query(actualizarTransaccionSql, [estadoTransaccion, idTransaccionWompi, transaccion.id]);
+      // 🔄 REGISTRAR EVENTO: Actualizar estado de la intención de checkout
+      await OrderService.updateCheckoutIntentStatus(
+        checkoutIntent.id,
+        estadoTransaccion,
+        idTransaccionWompi
+      );
+      
+      console.log('📝 [Pago] Evento registrado en intención de checkout:', {
+        checkoutIntentId: checkoutIntent.id,
+        referencia: referencia,
+        evento: evento,
+        estadoTransaccion: estadoTransaccion,
+        idTransaccionWompi: idTransaccionWompi
+      });
       
       // Procesar solo eventos de transacciones finalizadas
       if (evento === 'transaction.updated' || evento === 'transaction.created') {
         if (estadoTransaccion === 'APPROVED') {
-          // Transacción aprobada - CREAR el pedido con estado "pendiente"
+          // Transacción aprobada - Confirmar checkout y crear pedido
           try {
-            const datosCarrito = JSON.parse(transaccion.datos_carrito);
-            const datosUsuario = JSON.parse(transaccion.datos_usuario);
-            const datosEnvio = transaccion.datos_envio ? JSON.parse(transaccion.datos_envio) : null;
-            
-            // Preparar datos para crear el pedido
-            const orderData = {
-              usuarioId: transaccion.usuario_id,
-              cartId: transaccion.carrito_id,
-              direccionEnvioId: transaccion.direccion_envio_id || null,
-              metodoPago: transaccion.metodo_pago,
-              referenciaPago: referencia,
-              notas: transaccion.notas || null,
-              items: datosCarrito.items
-            };
-            
-            // Crear el pedido desde el carrito
-            const Order = require('../models/Order');
-            const pedido = await Order.createFromCart(orderData);
+            const pedido = await OrderService.confirmCheckout(checkoutIntent.id);
             
             console.log('✅ [Pago] Pedido creado desde webhook (pago aprobado):', {
               pedidoId: pedido.id,
               numeroOrden: pedido.numeroOrden,
               estado: pedido.estado, // Debe ser "pendiente"
+              checkoutIntentId: checkoutIntent.id,
               idTransaccion: idTransaccionWompi,
               referencia: referencia,
               evento: evento
             });
-            
-            // Enviar notificación de pedido creado
-            try {
-              const notificationService = require('../services/notifications/notificationService');
-              await notificationService.sendOrderStatusUpdateNotification(
-                transaccion.usuario_id,
-                {
-                  id: pedido.id,
-                  numeroOrden: pedido.numeroOrden
-                },
-                'pendiente'
-              );
-            } catch (notifError) {
-              console.error('⚠️ Error al enviar notificación de pedido creado:', notifError);
-            }
             
             // Responder 200 para confirmar a Wompi que recibimos el webhook
             return res.json({
@@ -577,7 +545,7 @@ class PagoController {
               estado: pedido.estado
             });
           } catch (errorCreacion) {
-            console.error('❌ [Pago] Error al crear pedido desde webhook:', errorCreacion);
+            console.error('❌ [Pago] Error al confirmar checkout desde webhook:', errorCreacion);
             // Responder 200 para que Wompi no reintente, pero registrar el error
             return res.status(200).json({
               success: false,
@@ -587,9 +555,9 @@ class PagoController {
           }
         } else if (estadoTransaccion === 'DECLINED' || estadoTransaccion === 'VOIDED' || estadoTransaccion === 'ERROR') {
           // Transacción rechazada, anulada o con error
-          // NO crear el pedido, solo registrar el rechazo
+          // NO crear el pedido, solo registrar el rechazo (ya registrado arriba)
           console.log('❌ [Pago] Pago rechazado - NO se creará pedido:', {
-            transaccionId: transaccion.id,
+            checkoutIntentId: checkoutIntent.id,
             estadoTransaccion: estadoTransaccion,
             referencia: referencia,
             mensaje: resultado.datos.mensaje || 'Pago rechazado o fallido'
@@ -604,7 +572,7 @@ class PagoController {
         } else if (estadoTransaccion === 'PENDING') {
           // Transacción aún pendiente - no hacer nada, esperar siguiente evento
           console.log('⏳ [Pago] Transacción pendiente, esperando siguiente evento:', {
-            transaccionId: transaccion.id,
+            checkoutIntentId: checkoutIntent.id,
             idTransaccion: idTransaccionWompi
           });
           
@@ -618,7 +586,7 @@ class PagoController {
         console.log('ℹ️ [Pago] Evento recibido pero no procesado:', {
           evento: evento,
           estado: estadoTransaccion,
-          transaccionId: transaccion.id
+          checkoutIntentId: checkoutIntent.id
         });
       }
 
@@ -626,7 +594,7 @@ class PagoController {
       res.json({
         success: true,
         message: 'Webhook procesado exitosamente',
-        transaccionId: transaccion.id,
+        checkoutIntentId: checkoutIntent.id,
         estadoTransaccion: estadoTransaccion
       });
     } catch (error) {
