@@ -29,7 +29,11 @@ const rutasRoutes = require('./routes/rutas');
 // const reportsRoutes = require('./routes/reportsold');
 const repartidoresRoutes = require('./routes/repartidores');
 const pagosRoutes = require('./routes/pagos');
-const pagoRedirectController = require('./controllers/pagoRedirectController');
+const cron = require('node-cron');
+const CheckoutReconciliationService = require('./services/checkoutReconciliationService');
+
+// Controladores
+const PagoRedirectController = require('./controllers/pagoRedirectController');
 
 // const { initAdvisorModule } = require('./services/advisorService'); // COMENTADO - MÓDULO DE ASESOR NO EN USO
 const { ensureDeliveryTables } = require('./services/deliveryService');
@@ -104,10 +108,9 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Rutas públicas de redirección de pagos (antes de las rutas de API)
-// Estas rutas son públicas y no requieren autenticación
-app.get('/pago-exitoso', pagoRedirectController.pagoExitoso);
-app.get('/pago-error', pagoRedirectController.pagoError);
+// Rutas públicas de redirección de pagos
+app.get('/pago-exitoso', PagoRedirectController.pagoExitoso);
+app.get('/pago-error', PagoRedirectController.pagoError);
 
 // Ruta de prueba para verificar imágenes
 app.get('/test-images', (req, res) => {
@@ -189,6 +192,16 @@ app.use('/api/search', searchRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/pagos', pagosRoutes);
+
+// Job de conciliación de checkout_intents (fallback de webhook)
+if (config.checkoutReconciliation?.enabled) {
+  cron.schedule(config.checkoutReconciliation.cron, async () => {
+    await CheckoutReconciliationService.reconcilePendingCheckoutIntents();
+  });
+  console.log('⏰ [Reconciliation] Job activo:', config.checkoutReconciliation.cron);
+} else {
+  console.log('⏸️ [Reconciliation] Job desactivado por configuración');
+}
 
 // Ruta raíz de la API
 app.get('/api/v1', (req, res) => {

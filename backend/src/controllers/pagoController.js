@@ -3,14 +3,60 @@ const Order = require('../models/Order');
 const { query } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 
+const normalizeCountryCode = (pais) => {
+  let paisCode = (pais || 'CO').toString().trim();
+  const paisLower = paisCode.toLowerCase();
+  if (paisLower === 'colombia' || paisLower === 'col' || paisLower === 'co') {
+    paisCode = 'CO';
+  } else if (paisCode.length !== 2) {
+    paisCode = 'CO';
+  }
+  return paisCode.toUpperCase();
+};
+
+const mapDireccionEnvio = (direccionRow) => {
+  if (!direccionRow) return { direccionEnvio: null, datosEnvio: null, ciudadEnvio: null };
+  const paisCode = normalizeCountryCode(direccionRow.pais);
+  return {
+    ciudadEnvio: direccionRow.ciudad,
+    direccionEnvio: {
+      nombreDestinatario: direccionRow.nombre_destinatario,
+      telefono: direccionRow.telefono,
+      direccion: direccionRow.direccion,
+      ciudad: direccionRow.ciudad,
+      departamento: direccionRow.departamento,
+      codigoPostal: direccionRow.codigo_postal,
+      pais: paisCode,
+      instrucciones: direccionRow.instrucciones || null
+    },
+    datosEnvio: {
+      direccionEnvioId: direccionRow.id,
+      nombreDestinatario: direccionRow.nombre_destinatario,
+      telefono: direccionRow.telefono,
+      direccion: direccionRow.direccion,
+      ciudad: direccionRow.ciudad,
+      departamento: direccionRow.departamento,
+      codigoPostal: direccionRow.codigo_postal,
+      pais: paisCode,
+      instrucciones: direccionRow.instrucciones || null
+    }
+  };
+};
+
 /**
- * Controlador de Pagos
- * 
- * Maneja todas las operaciones relacionadas con pagos a través de Wompi:
- * - Crear transacciones de pago
- * - Consultar estado de pagos
+ * Este archivo define un controlador de pagos (PagoController) para una API en Node.js + Express,
+ * encargado de todo el ciclo de vida de un pago con Wompi:
+ *
+ * - Crear una transacción de pago
+ * - Generar la URL de Web Checkout
+ * - Registrar la intención de pago
  * - Procesar webhooks de Wompi
- * - Actualizar pedidos con información de pago
+ * - Confirmar pedidos
+ * - Consultar pagos manualmente
+ * - Manejar fallos de webhooks
+ * - Exponer configuración pública al frontend
+ * - Controlar tiempos de espera de pago
+ * - Depurar la clave pública de Wompi
  */
 class PagoController {
   /**
@@ -29,31 +75,16 @@ class PagoController {
 
       const userId = req.user.id;
       const {
-        metodoPago,
         direccionEnvioId,
-        notas = null,
-        datosPSE, // Opcional: datos para pre-llenar información (Web Checkout)
-        datosNequi, // Opcional: datos para pre-llenar información (Web Checkout)
-        datosBancolombia // Opcional: datos para pre-llenar información (Web Checkout)
+        notas = null
         // NOTA: urlRedireccion y urlRedireccionError NO se extraen del body
         // El backend siempre usa las URLs configuradas en variables de entorno (WOMPI_URL_REDIRECCION, WOMPI_URL_REDIRECCION_ERROR)
       } = req.body;
 
-      console.log('🔍 [Pago] Crear transacción - Datos recibidos:', {
-        userId,
-        metodoPago,
-        direccionEnvioId,
-        userFromReq: req.user
-      });
+      // Único flujo soportado: Web Checkout
+      const metodoPago = 'checkout';
 
-      // Validar método de pago
-      const metodosPermitidos = ['tarjeta', 'pse', 'nequi', 'bancolombia_transfer'];
-      if (!metodoPago || !metodosPermitidos.includes(metodoPago.toLowerCase())) {
-        return res.status(400).json({
-          success: false,
-          message: `Método de pago inválido. Métodos permitidos: ${metodosPermitidos.join(', ')}`
-        });
-      }
+      console.log('🔍 [Pago] Crear transacción:', { userId, direccionEnvioId });
 
       // Obtener el carrito del usuario
       const Cart = require('../models/Cart');
@@ -79,72 +110,29 @@ class PagoController {
       // Calcular totales del carrito
       const subtotal = cart.items.reduce((sum, item) => sum + (item.subtotal || 0), 0);
       
-      // Obtener ciudad de envío para calcular costo
+      let direccionEnvio = null;
+      let datosEnvio = null;
       let ciudadEnvio = null;
       if (direccionEnvioId) {
         const direccionSql = `
-          SELECT ciudad 
-          FROM direcciones_envio 
+          SELECT id, nombre_destinatario, telefono, direccion, ciudad,
+                 departamento, codigo_postal, pais, instrucciones
+          FROM direcciones_envio
           WHERE id = ? AND usuario_id = ? AND activa = true
         `;
         const direcciones = await query(direccionSql, [direccionEnvioId, userId]);
         if (direcciones.length > 0) {
-          ciudadEnvio = direcciones[0].ciudad;
+          const mapped = mapDireccionEnvio(direcciones[0]);
+          direccionEnvio = mapped.direccionEnvio;
+          datosEnvio = mapped.datosEnvio;
+          ciudadEnvio = mapped.ciudadEnvio;
         }
       }
-      
+
       const costoEnvio = Order.calcularCostoEnvio(subtotal, ciudadEnvio);
       const impuestos = 0;
       const descuento = 0;
       const total = subtotal - descuento + costoEnvio + impuestos;
-
-      // Obtener dirección de envío si está disponible
-      let direccionEnvio = null;
-      let datosEnvio = null;
-      if (direccionEnvioId) {
-        const direccionSql = `
-          SELECT id, nombre_destinatario, telefono, direccion, ciudad, 
-                 departamento, codigo_postal, pais, instrucciones
-          FROM direcciones_envio
-          WHERE id = ? AND usuario_id = ?
-        `;
-        const direcciones = await query(direccionSql, [direccionEnvioId, userId]);
-        if (direcciones.length > 0) {
-          // Normalizar código de país a formato ISO 3166-1 Alpha-2
-          let paisCode = direcciones[0].pais || 'CO';
-          const paisLower = paisCode.toLowerCase().trim();
-          if (paisLower === 'colombia' || paisLower === 'col' || paisLower === 'co') {
-            paisCode = 'CO';
-          } else if (paisCode.length !== 2) {
-            // Si no es un código de 2 letras, usar CO por defecto
-            paisCode = 'CO';
-          }
-          paisCode = paisCode.toUpperCase();
-          
-          direccionEnvio = {
-            nombreDestinatario: direcciones[0].nombre_destinatario,
-            telefono: direcciones[0].telefono,
-            direccion: direcciones[0].direccion,
-            ciudad: direcciones[0].ciudad,
-            departamento: direcciones[0].departamento,
-            codigoPostal: direcciones[0].codigo_postal,
-            pais: paisCode, // Código ISO 3166-1 Alpha-2 (CO, US, etc.)
-            instrucciones: direcciones[0].instrucciones || null // Puede ser null si está vacío
-          };
-          
-          datosEnvio = {
-            direccionEnvioId: direcciones[0].id,
-            nombreDestinatario: direcciones[0].nombre_destinatario,
-            telefono: direcciones[0].telefono,
-            direccion: direcciones[0].direccion,
-            ciudad: direcciones[0].ciudad,
-            departamento: direcciones[0].departamento,
-            codigoPostal: direcciones[0].codigo_postal,
-            pais: paisCode,
-            instrucciones: direcciones[0].instrucciones || null
-          };
-        }
-      }
 
       // Obtener datos del usuario para la transacción
       const usuarioSql = `
@@ -153,21 +141,12 @@ class PagoController {
         WHERE id = ?
       `;
       
-      console.log('🔍 [Pago] Consultando usuario con ID:', userId);
       const usuarios = await query(usuarioSql, [userId]);
-      console.log('🔍 [Pago] Resultado de consulta usuario:', {
-        usuariosLength: usuarios?.length,
-        usuarios: usuarios,
-        userId: userId
-      });
       
       const usuario = usuarios && usuarios.length > 0 ? usuarios[0] : null;
 
       if (!usuario) {
-        console.error('❌ [Pago] Usuario no encontrado en BD:', {
-          userId,
-          usuariosResult: usuarios
-        });
+        console.error('❌ [Pago] Usuario no encontrado en BD:', { userId });
         return res.status(404).json({
           success: false,
           message: 'Usuario no encontrado'
@@ -175,8 +154,7 @@ class PagoController {
       }
 
       // Preparar datos del cliente
-      // Usar datos de los formularios si están disponibles, de lo contrario usar datos del usuario
-      let cliente = {
+      const cliente = {
         email: usuario.email,
         nombre: usuario.nombre_completo || usuario.email,
         telefono: usuario.telefono || '',
@@ -184,37 +162,7 @@ class PagoController {
         numeroIdentificacion: usuario.numero_identificacion || ''
       };
 
-      // Pre-llenar información del cliente con datos de los formularios (para Web Checkout)
-      // Estos datos ayudan a pre-llenar los campos en la interfaz de Wompi
-      if (metodoPago.toLowerCase() === 'nequi' && datosNequi && datosNequi.telefono) {
-        // Usar el teléfono de Nequi si está disponible
-        cliente.telefono = datosNequi.telefono;
-        console.log('📱 [Pago] Usando teléfono de Nequi para pre-llenar:', datosNequi.telefono);
-      }
-
-      if (metodoPago.toLowerCase() === 'pse' && datosPSE) {
-        // Usar datos de PSE para pre-llenar información del cliente
-        if (datosPSE.numeroIdentificacion) {
-          cliente.numeroIdentificacion = datosPSE.numeroIdentificacion;
-        }
-        if (datosPSE.tipoIdentificacion) {
-          cliente.tipoIdentificacion = datosPSE.tipoIdentificacion;
-        }
-        console.log('🏦 [Pago] Usando datos de PSE para pre-llenar:', {
-          numeroIdentificacion: datosPSE.numeroIdentificacion,
-          tipoIdentificacion: datosPSE.tipoIdentificacion
-        });
-      }
-      // Nota Web Checkout:
-      // Aquí NO creamos transacción por API directa ni construimos payload de payment_method.
-      // Solo generamos la URL del Web Checkout (GET params) y guardamos la referencia en el pedido.
-
-      // Generar referencia única para la transacción
-      // 🚨 IMPORTANTE: Wompi NO permite reutilizar referencias, incluso si el pago falló
-      // Cada intento de pago DEBE tener una referencia única
-      // 🚨 REGLA OFICIAL: Wompi requiere máximo 40 caracteres para reference
-      // Formato: PED-{uuid8chars}-{timestamp}
-      // Ejemplo: PED-6c6efa1c-1769185739004 (26 caracteres ✅)
+      // Generar referencia única para la transacción (máximo 40 caracteres)
       const transaccionId = uuidv4();
       const transaccionIdCorto = transaccionId.replace(/-/g, '').substring(0, 8);
       const timestamp = Date.now();
@@ -225,14 +173,7 @@ class PagoController {
         throw new Error(`La referencia generada excede el límite de 40 caracteres de Wompi: ${referencia.length} caracteres. Referencia: ${referencia}`);
       }
       
-      console.log('🔄 [Pago] Generando referencia única de pago (Wompi requiere unicidad y máximo 40 caracteres):', {
-        transaccionId,
-        referencia,
-        referenciaLength: referencia.length,
-        garantizaUnicidad: true,
-        formato: 'PED-{uuid8chars}-{timestamp}',
-        cumpleLimite40: referencia.length <= 40
-      });
+      console.log('🔄 [Pago] Referencia generada:', { referencia });
 
       // Convertir monto a centavos (Wompi espera el monto en centavos)
       const montoEnCentavos = Math.round(total * 100);
@@ -286,12 +227,7 @@ class PagoController {
         datosEnvio ? JSON.stringify(datosEnvio) : null
       ]);
       
-      console.log('✅ [Pago] Intención de checkout guardada:', {
-        checkoutIntentId: transaccionId,
-        referencia,
-        usuarioId: userId,
-        carritoId: cart.id
-      });
+      console.log('✅ [Pago] Intención de checkout guardada:', { referencia });
 
       // IMPORTANTE: No usar URLs del frontend
       // El backend siempre usa las URLs configuradas en variables de entorno (WOMPI_URL_REDIRECCION, WOMPI_URL_REDIRECCION_ERROR)
@@ -301,9 +237,6 @@ class PagoController {
       const urlRedireccionErrorFinal = undefined; // Siempre usar configuración del backend
 
       // Generar URL de Web Checkout de Wompi
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/160eac0e-a445-4a66-bfc8-5375d2c112f6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'pagoController.js:318',message:'ANTES generarUrlWebCheckout',data:{referencia,montoEnCentavos,clienteEmail:cliente.email,clienteNombre:cliente.nombre,hasDireccionEnvio:!!direccionEnvio},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       const resultadoCheckout = await wompiService.generarUrlWebCheckout({
         referencia,
         monto: montoEnCentavos,
@@ -315,9 +248,6 @@ class PagoController {
         direccionEnvio: direccionEnvio, // Agregar dirección de envío si está disponible
         impuestos: null // Puede agregarse en el futuro si se requiere detallar impuestos
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/160eac0e-a445-4a66-bfc8-5375d2c112f6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'pagoController.js:329',message:'DESPUÉS generarUrlWebCheckout',data:{exito:resultadoCheckout.exito,hasUrlCheckout:!!resultadoCheckout.datos?.urlCheckout,urlCheckoutLength:resultadoCheckout.datos?.urlCheckout?.length,error:resultadoCheckout.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
 
       if (!resultadoCheckout.exito) {
         return res.status(400).json({
@@ -328,34 +258,9 @@ class PagoController {
         });
       }
 
-      console.log('✅ [Pago] URL de Web Checkout generada exitosamente:', {
-        transaccionId,
-        referencia,
-        metodoPago,
-        siguientePaso: 'Esperando confirmación de pago vía webhook de Wompi. El pedido se creará cuando el pago sea aprobado.'
-      });
+      console.log('✅ [Pago] URL de Web Checkout generada:', { referencia });
 
-      // 🔍 DEBUG: Verificar URL antes de enviar al frontend
       const urlCheckoutFinal = resultadoCheckout.datos.urlCheckout;
-      console.log('🔍 [Pago] URL que se enviará al frontend:', {
-        urlLength: urlCheckoutFinal.length,
-        urlPrefix: urlCheckoutFinal.substring(0, 200),
-        urlSuffix: urlCheckoutFinal.substring(Math.max(0, urlCheckoutFinal.length - 100)),
-        hasSignature: urlCheckoutFinal.includes('signature:integrity'),
-        hasEncodedPlus: urlCheckoutFinal.includes('%2B'),
-        hasPlus: urlCheckoutFinal.includes('+'),
-        paramCount: urlCheckoutFinal.split('&').length,
-        isWompiDomain: urlCheckoutFinal.includes('checkout.wompi.co'),
-        urlCompleta: urlCheckoutFinal // 🔥 URL completa para debugging
-      });
-      
-      // 🔥 IMPORTANTE: Para debugging, también mostrar la URL completa en un formato copiable
-      console.log('\n🔥 [DEBUG] URL COMPLETA PARA PROBAR EN NAVEGADOR:');
-      console.log('═══════════════════════════════════════════════════════════════════════════════');
-      console.log(urlCheckoutFinal);
-      console.log('═══════════════════════════════════════════════════════════════════════════════');
-      console.log('💡 INSTRUCCIONES: Copia esta URL y ábrela en tu navegador para verificar si Wompi la acepta.');
-      console.log('   Si Wompi muestra "Página no disponible", hay un problema con la URL o los parámetros.\n');
 
       // Respuesta exitosa con URL de checkout
       res.status(201).json({
@@ -410,15 +315,29 @@ class PagoController {
         });
       }
 
-      // Si la transacción está aprobada, actualizar el pedido
+      // Si la transacción está aprobada, actualizar/crear el pedido (fallback si el webhook falló)
       if (resultado.datos.estado === 'APPROVED') {
+        const CheckoutService = require('../services/pagos/checkoutService');
+        const referenciaPago = resultado.datos.referencia;
+
+        // Sincronizar intención y crear pedido si aún no existe
+        const checkoutIntent = await CheckoutService.obtenerIntencionPorReferencia(referenciaPago);
+        if (checkoutIntent) {
+          await CheckoutService.actualizarEstado(
+            checkoutIntent.id,
+            'APPROVED',
+            resultado.datos.id || idTransaccion
+          );
+          await CheckoutService.confirmarCheckout(checkoutIntent.id);
+        }
+
         // Buscar pedido por referencia
         const pedidoSql = `
           SELECT id, estado, referencia_pago
           FROM ordenes
           WHERE referencia_pago = ? AND usuario_id = ?
         `;
-        const pedidos = await query(pedidoSql, [resultado.datos.referencia, userId]);
+        const pedidos = await query(pedidoSql, [referenciaPago, userId]);
 
         if (pedidos.length > 0) {
           const pedido = pedidos[0];
@@ -489,8 +408,8 @@ class PagoController {
 
       // Buscar intención de checkout por referencia
       const referencia = resultado.datos.referencia;
-      const OrderService = require('../services/orderService');
-      const checkoutIntent = await OrderService.getCheckoutIntentByReference(referencia);
+      const CheckoutService = require('../services/pagos/checkoutService');
+      const checkoutIntent = await CheckoutService.obtenerIntencionPorReferencia(referencia);
 
       if (!checkoutIntent) {
         console.warn('⚠️ [Pago] Intención de checkout no encontrada para referencia:', referencia);
@@ -506,7 +425,7 @@ class PagoController {
       const idTransaccionWompi = resultado.datos.idTransaccion;
       
       // 🔄 REGISTRAR EVENTO: Actualizar estado de la intención de checkout
-      await OrderService.updateCheckoutIntentStatus(
+      await CheckoutService.actualizarEstado(
         checkoutIntent.id,
         estadoTransaccion,
         idTransaccionWompi
@@ -525,7 +444,7 @@ class PagoController {
         if (estadoTransaccion === 'APPROVED') {
           // Transacción aprobada - Confirmar checkout y crear pedido
           try {
-            const pedido = await OrderService.confirmCheckout(checkoutIntent.id);
+            const pedido = await CheckoutService.confirmarCheckout(checkoutIntent.id);
             
             console.log('✅ [Pago] Pedido creado desde webhook (pago aprobado):', {
               pedidoId: pedido.id,
@@ -608,39 +527,7 @@ class PagoController {
     }
   }
 
-  /**
-   * Obtener lista de bancos disponibles para PSE
-   * GET /api/v1/pagos/bancos-pse
-   */
-  static async obtenerBancosPSE(req, res) {
-    try {
-      const resultado = await wompiService.obtenerBancosPSE();
-
-      if (!resultado.exito) {
-        return res.status(400).json({
-          success: false,
-          message: 'Error al obtener bancos PSE',
-          error: resultado.error
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Bancos obtenidos exitosamente',
-        data: {
-          bancos: resultado.datos
-        }
-      });
-    } catch (error) {
-      console.error('❌ [Pago] Error al obtener bancos PSE:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error al obtener bancos'
-      });
-    }
-  }
-
+  
   /**
    * Obtener configuración pública de Wompi (para frontend)
    * GET /api/v1/pagos/configuracion

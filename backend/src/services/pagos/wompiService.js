@@ -904,6 +904,68 @@ class WompiService {
   }
 
   /**
+   * Consultar transacción por referencia
+   * @param {string} referencia - Referencia única de la transacción
+   * @returns {Promise<Object>} Estado de la transacción
+   */
+  async consultarTransaccionPorReferencia(referencia) {
+    try {
+      if (!referencia) {
+        throw new Error('Referencia es requerida');
+      }
+
+      console.log('🔍 [Wompi] Consultando transacción por referencia:', referencia);
+
+      const respuesta = await this.cliente.get('/transactions', {
+        params: { reference: referencia }
+      });
+
+      if (!respuesta.data || !respuesta.data.data) {
+        throw new Error('Respuesta inválida de Wompi');
+      }
+
+      const data = respuesta.data.data;
+      const transaccion = Array.isArray(data) ? data[0] : data;
+
+      if (!transaccion) {
+        return {
+          exito: false,
+          error: 'Transacción no encontrada'
+        };
+      }
+
+      console.log('✅ [Wompi] Transacción consultada por referencia:', {
+        id: transaccion.id,
+        referencia: transaccion.reference,
+        estado: transaccion.status
+      });
+
+      return {
+        exito: true,
+        datos: {
+          id: transaccion.id,
+          referencia: transaccion.reference,
+          estado: transaccion.status,
+          monto: transaccion.amount_in_cents,
+          moneda: transaccion.currency,
+          metodoPago: transaccion.payment_method_type,
+          fechaCreacion: transaccion.created_at,
+          fechaFinalizacion: transaccion.finalized_at,
+          mensaje: transaccion.status_message || null
+        }
+      };
+    } catch (error) {
+      console.error('❌ [Wompi] Error al consultar transacción por referencia:', error.response?.data || error.message);
+
+      return {
+        exito: false,
+        error: error.response?.data?.error || error.message,
+        detalles: error.response?.data || null
+      };
+    }
+  }
+
+  /**
    * Validar la firma de un webhook de Wompi
    * @param {Object} payload - Payload del webhook
    * @param {string} signatureRecibida - Firma recibida en el header X-Event-Checksum

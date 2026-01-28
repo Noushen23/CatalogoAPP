@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { ThemedView } from '@/presentation/theme/components/ThemedView';
 import { ThemedText } from '@/presentation/theme/components/ThemedText';
@@ -57,6 +57,12 @@ export default function CartScreen() {
     // La navegación se maneja en CartSummary
     console.log('Checkout iniciado desde Cart');
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   if (isLoading && !refreshing) {
     return <FullScreenLoader message="Cargando carrito..." />;

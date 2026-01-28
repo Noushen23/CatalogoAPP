@@ -372,11 +372,10 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
         <View style={styles.paymentInfo}>
           <Ionicons name="card-outline" size={16} color="#666" />
           <ThemedText style={styles.paymentText}>
-            {order.metodoPago === 'tarjeta' ? 'Tarjeta' :
-             order.metodoPago === 'pse' ? 'PSE' :
-             order.metodoPago === 'nequi' ? 'Nequi' :
-             order.metodoPago === 'bancolombia_transfer' ? 'Bancolombia' :
-             order.metodoPago ? order.metodoPago.charAt(0).toUpperCase() + order.metodoPago.slice(1).replace('_', ' ') : 'No especificado'}
+            {order.metodoPago === 'efectivo' ? 'Efectivo' : 
+             order.metodoPago === 'tarjeta' ? 'Tarjeta' :
+             order.metodoPago === 'transferencia' ? 'Transferencia' :
+             order.metodoPago === 'pse' ? 'PSE' : order.metodoPago}
           </ThemedText>
         </View>
         {order.referenciaPago && (

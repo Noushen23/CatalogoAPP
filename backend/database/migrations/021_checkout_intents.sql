@@ -1,11 +1,10 @@
--- Migration 019: Tabla para transacciones pendientes de pago
+-- Migration 021: Crear tabla checkout_intents
 -- Date: 2025-01-22
--- Purpose: Guardar datos del pedido antes de que el pago sea aprobado
+-- Purpose: Almacenar intenciones de checkout antes de aprobación del pago
 
 USE TiendaMovil;
 
--- Crear tabla para guardar datos del pedido antes de aprobación del pago
-CREATE TABLE IF NOT EXISTS transacciones_pendientes (
+CREATE TABLE IF NOT EXISTS checkout_intents (
     id CHAR(36) PRIMARY KEY,
     referencia_pago VARCHAR(40) NOT NULL UNIQUE COMMENT 'Referencia única de pago de Wompi',
     usuario_id CHAR(36) NOT NULL,
@@ -29,7 +28,6 @@ CREATE TABLE IF NOT EXISTS transacciones_pendientes (
     INDEX idx_fecha_creacion (fecha_creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Comentarios en la tabla
-ALTER TABLE transacciones_pendientes COMMENT = 'Tabla temporal para guardar datos del pedido antes de aprobación del pago';
+ALTER TABLE checkout_intents COMMENT = 'Intenciones de checkout antes de aprobación del pago';
 
 COMMIT;

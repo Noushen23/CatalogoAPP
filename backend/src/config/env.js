@@ -3,9 +3,12 @@ require('dotenv').config();
 // Log de variables de entorno relacionadas con URLs (solo al cargar el módulo)
 console.log('🔍 [Config] Variables de entorno detectadas:', {
   API_BASE_URL: process.env.API_BASE_URL || 'NO CONFIGURADA',
-TERCERO_API_URL: process.env.TERCERO_API_URL || 'NO CONFIGURADA',  
-APP_URL: process.env.APP_URL || 'NO CONFIGURADA',
-  NODE_ENV: process.env.NODE_ENV || 'NO CONFIGURADA'
+  TERCERO_API_URL: process.env.TERCERO_API_URL || 'NO CONFIGURADA',  
+  APP_URL: process.env.APP_URL || 'NO CONFIGURADA',
+  NODE_ENV: process.env.NODE_ENV || 'NO CONFIGURADA',
+  NGROK_URL: process.env.NGROK_URL || 'NO CONFIGURADA',
+  WOMPI_NGROK_URL: process.env.WOMPI_NGROK_URL || 'NO CONFIGURADA',
+  API_URL: process.env.API_URL || 'NO CONFIGURADA'
 });
 
 const config = {
@@ -187,6 +190,11 @@ const config = {
     urlRedireccion: process.env.WOMPI_URL_REDIRECCION || '',
     // URL de redirección en caso de error
     urlRedireccionError: process.env.WOMPI_URL_REDIRECCION_ERROR || ''
+  },
+
+  checkoutReconciliation: {
+    enabled: process.env.CHECKOUT_RECONCILIATION_ENABLED !== 'false',
+    cron: process.env.CHECKOUT_RECONCILIATION_CRON || '*/5 * * * *'
   }
 };
 

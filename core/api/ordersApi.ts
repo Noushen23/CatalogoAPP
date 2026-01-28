@@ -74,17 +74,8 @@ export interface OrderStats {
   averageOrderValue: number;
 }
 
-export interface CreateOrderRequest {
-  direccionEnvioId?: string;
-  metodoPago?: 'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer';
-  referenciaPago?: string;
-  notas?: string;
-}
-
 export interface CreateOrderFromCartRequest {
   direccionEnvioId?: string;
-  metodoPago?: 'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer';
-  referenciaPago?: string;
   notas?: string;
 }
 
@@ -135,6 +126,11 @@ export const ordersApi = {
   // Obtener pedido específico del usuario
   async getUserOrder(orderId: string): Promise<ApiResponse<Order>> {
     return await apiClient.get<Order>(`/orders/my-orders/${orderId}`);
+  },
+
+  // Obtener pedido por referencia de pago (usuario)
+  async getUserOrderByReference(referencia: string): Promise<ApiResponse<Order>> {
+    return await apiClient.get<Order>(`/orders/by-reference?referencia=${encodeURIComponent(referencia)}`);
   },
 
   // Crear pedido desde carrito

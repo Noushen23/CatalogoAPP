@@ -189,6 +189,9 @@ export default function CheckoutScreen() {
         // Guardar URL en SecureStore como respaldo (por si la URL es muy larga para los parámetros)
         try {
           await SecureStore.setItemAsync('wompi_checkout_url', transaccionResult.urlCheckout);
+          if (transaccionResult.referencia) {
+            await SecureStore.setItemAsync('wompi_checkout_ref', transaccionResult.referencia);
+          }
         } catch (storeError) {
           console.warn('⚠️ [Checkout] No se pudo guardar URL en SecureStore:', storeError);
           // Continuar de todas formas, la URL se pasará como parámetro
@@ -208,6 +211,7 @@ export default function CheckoutScreen() {
           params: {
             transaccionId: transaccionResult.transaccionId,
             urlCheckout: transaccionResult.urlCheckout,
+            referencia: transaccionResult.referencia,
           },
         });
       } else {
@@ -412,7 +416,7 @@ export default function CheckoutScreen() {
                 <PSEDataForm
                   onDataSelected={(data) => {
                     setPseData({
-                      tipoIdentificacion: data.tipoIdentificacion,
+                      tipoIdentificacion: data.tipoIdentificacion as DatosPSE['tipoIdentificacion'],
                       numeroIdentificacion: data.numeroIdentificacion,
                     });
                   }}

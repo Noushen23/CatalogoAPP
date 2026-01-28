@@ -110,6 +110,14 @@ const validatePagination = [
   handleValidationErrors
 ];
 
+const validateReferencia = [
+  query('referencia')
+    .notEmpty()
+    .isLength({ max: 50 })
+    .withMessage('Referencia inválida'),
+  handleValidationErrors
+];
+
 // Rutas públicas (sin autenticación)
 // Ninguna ruta de pedidos es pública
 
@@ -118,6 +126,9 @@ router.use(authenticateToken);
 
 // Obtener pedidos del usuario autenticado
 router.get('/my-orders', validatePagination, OrderUserController.getUserOrders);
+
+// Obtener pedido por referencia de pago
+router.get('/by-reference', validateReferencia, OrderUserController.getUserOrderByReference);
 
 // Obtener estadísticas de pedidos del usuario
 router.get('/my-stats', OrderStatsController.getUserOrderStats);

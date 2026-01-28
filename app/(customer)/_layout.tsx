@@ -105,6 +105,10 @@ export default function CustomerLayout() {
           options={{ href: null, headerShown: false }}
         />
         <Tabs.Screen
+          name="wompi-checkout"
+          options={{ href: null, headerShown: false }}
+        />
+        <Tabs.Screen
           name="product/[id]"
           options={{ href: null, headerShown: false }}
         />
