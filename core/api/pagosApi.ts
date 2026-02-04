@@ -3,6 +3,7 @@ import { apiClient, ApiResponse } from './apiClient';
 // Interfaces para pagos con Wompi (Web Checkout)
 
 export interface CrearTransaccionRequest {
+  metodoPago?: 'wompi';
   direccionEnvioId?: string;
   notas?: string;
 }
@@ -28,6 +29,8 @@ export interface CrearTransaccionResponse {
   monto: number;
   moneda: string;
   transaccionId: string;
+  pedidoId?: string;
+  numeroOrden?: string;
 }
 
 export interface CheckoutStatusResponse {
@@ -54,6 +57,16 @@ export const pagosApi = {
    */
   async crearTransaccion(data: CrearTransaccionRequest): Promise<ApiResponse<CrearTransaccionResponse>> {
     return await apiClient.post<CrearTransaccionResponse>('/pagos/crear', data);
+  },
+
+  /**
+   * Reintentar el pago de un pedido cancelado por pago fallido
+   */
+  async reintentarPago(
+    pedidoId: string,
+    data: CrearTransaccionRequest = {}
+  ): Promise<ApiResponse<CrearTransaccionResponse>> {
+    return await apiClient.post<CrearTransaccionResponse>(`/pagos/reintentar/${pedidoId}`, data);
   },
 
   /**

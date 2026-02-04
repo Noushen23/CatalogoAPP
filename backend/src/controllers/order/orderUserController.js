@@ -1,7 +1,10 @@
 const Order = require('../../models/Order');
 const Cart = require('../../models/Cart');
-const CheckoutService = require('../../services/checkoutService');
+const CheckoutService = require('../../services/pagos/checkoutService');
 const notificationService = require('../../services/notificationService');
+const { query } = require('../../config/database');
+const { getPriceListByCity } = require('../../utils/shippingCost');
+const { v4: uuidv4 } = require('uuid');
 
 class OrderUserController {
 
@@ -105,13 +108,26 @@ class OrderUserController {
    * ===================================================== */
   static async calcularCostoEnvio(req, res) {
     try {
-      const { subtotal } = req.body;
+      const userId = req.user.id;
+      const { subtotal, direccionEnvioId, ciudadEnvio } = req.body;
 
       if (subtotal == null || subtotal < 0) {
         return res.status(400).json({ success: false, message: 'Subtotal inválido' });
       }
 
-      const costoEnvio = Order.calcularCostoEnvio(Number(subtotal));
+      // Resolver ciudad desde la dirección guardada o usar la enviada directamente
+      let ciudad = ciudadEnvio || null;
+      if (!ciudad && direccionEnvioId) {
+        const direcciones = await query(
+          'SELECT ciudad FROM direcciones_envio WHERE id = ? AND usuario_id = ? AND activa = true',
+          [direccionEnvioId, userId]
+        );
+        ciudad = direcciones?.[0]?.ciudad || null;
+      }
+
+      // Calcular costo con lista de precios por ciudad (fallback a lista 5)
+      const costoEnvio = await Order.calcularCostoEnvio(Number(subtotal), ciudad);
+      const listaPrecio = getPriceListByCity(ciudad);
 
       res.json({
         success: true,
@@ -119,7 +135,9 @@ class OrderUserController {
           subtotal: Number(subtotal),
           costoEnvio,
           total: Number(subtotal) + costoEnvio,
-          envioGratis: Number(subtotal) >= 300000
+          ciudad: ciudad,
+          listaPrecio,
+          envioGratis: costoEnvio === 0
         }
       });
     } catch {
@@ -128,9 +146,10 @@ class OrderUserController {
   }
 
   /* =====================================================
-   * INICIAR CHECKOUT (NO CREA PEDIDO)
+   * INICIAR CHECKOUT (CREA PEDIDO PENDIENTE DE PAGO)
    * ===================================================== */
   static async createOrderFromCart(req, res) {
+    let pedidoCreado = null;
     try {
       const userId = req.user.id;
       const { direccionEnvioId, metodoPago, notas } = req.body;
@@ -145,15 +164,45 @@ class OrderUserController {
         return res.status(400).json({ success: false, errors: validation.errors });
       }
 
+      // Generar referencia única compatible con Wompi (máximo 40 caracteres)
+      const transaccionId = uuidv4();
+      const transaccionIdCorto = transaccionId.replace(/-/g, '').substring(0, 8);
+      const timestamp = Date.now();
+      const referencia = `PED-${transaccionIdCorto}-${timestamp}`;
+
+      if (referencia.length > 40) {
+        throw new Error(`Referencia excede el límite de Wompi: ${referencia}`);
+      }
+
+      // Mapear items al formato esperado por la orden
+      const orderItems = cart.items.map(item => ({
+        productId: item.productoId || item.productId,
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        subtotal: item.subtotal
+      }));
+
+      // Crear pedido desde el inicio con estado pendiente
+      pedidoCreado = await Order.createFromCart({
+        usuarioId: userId,
+        cartId: cart.id,
+        direccionEnvioId,
+        metodoPago,
+        referenciaPago: referencia,
+        notas,
+        items: orderItems,
+        estado: 'pendiente'
+      });
+
       /* 🔐 Crear intención de checkout */
       const intent = await CheckoutService.crearIntencion({
-        referenciaPago: null,
+        referenciaPago: referencia,
         usuarioId: userId,
         carritoId: cart.id,
         direccionEnvioId,
         metodoPago,
         notas,
-        datosCarrito: { items: cart.items },
+        datosCarrito: { items: orderItems },
         datosUsuario: { id: userId },
         datosEnvio: null
       });
@@ -163,11 +212,21 @@ class OrderUserController {
         message: 'Checkout iniciado',
         data: {
           checkoutIntentId: intent.id,
-          estado: intent.estado
+          estado: intent.estado,
+          pedidoId: pedidoCreado.id,
+          numeroOrden: pedidoCreado.numeroOrden,
+          referenciaPago: referencia
         }
       });
 
     } catch (error) {
+      if (pedidoCreado?.id) {
+        try {
+          await Order.markPaymentFailed(pedidoCreado.id, 'Error al iniciar el checkout');
+        } catch (cleanupError) {
+          console.error('❌ [Order] Error al revertir pedido tras fallo de checkout:', cleanupError);
+        }
+      }
       res.status(500).json({
         success: false,
         message: 'Error al iniciar checkout'
@@ -189,6 +248,13 @@ class OrderUserController {
 
       if (order.usuarioId !== userId) {
         return res.status(403).json({ success: false, message: 'No autorizado' });
+      }
+
+      if (order.estado === 'cancelada') {
+        return res.json({
+          success: true,
+          data: order.toPublicObject()
+        });
       }
 
       if (order.estado !== 'pendiente') {

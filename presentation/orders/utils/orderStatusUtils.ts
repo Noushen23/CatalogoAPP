@@ -45,7 +45,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
  * Configuración de textos legibles para cada estado
  */
 const STATUS_TEXTS: Record<OrderStatus, string> = {
-  pendiente: 'Pendiente',
+  pendiente: 'Pendiente de pago',
   confirmada: 'Confirmada',
   en_proceso: 'En Proceso',
   enviada: 'Enviada',
@@ -79,8 +79,21 @@ const STATUS_ICONS: Record<OrderStatus, keyof typeof Ionicons.glyphMap> = {
  * getOrderStatusColor('cancelada') // '#F44336'
  * ```
  */
+const normalizeOrderStatus = (status: string): OrderStatus | null => {
+  const normalized = (status || '').toString().trim().toLowerCase();
+  if (normalized === 'error' || normalized === 'fallido' || normalized === 'failed') {
+    return 'cancelada';
+  }
+  if ((STATUS_COLORS as Record<string, string>)[normalized]) {
+    return normalized as OrderStatus;
+  }
+  return null;
+};
+
 export function getOrderStatusColor(status: string): string {
-  return STATUS_COLORS[status as OrderStatus] || '#666';
+  if (!status) return '#F44336';
+  const normalized = normalizeOrderStatus(status);
+  return normalized ? STATUS_COLORS[normalized] : '#666';
 }
 
 /**
@@ -96,7 +109,9 @@ export function getOrderStatusColor(status: string): string {
  * ```
  */
 export function getOrderStatusText(status: string): string {
-  return STATUS_TEXTS[status as OrderStatus] || status;
+  if (!status) return 'Error';
+  const normalized = normalizeOrderStatus(status);
+  return normalized ? STATUS_TEXTS[normalized] : status;
 }
 
 /**
@@ -112,7 +127,9 @@ export function getOrderStatusText(status: string): string {
  * ```
  */
 export function getOrderStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
-  return STATUS_ICONS[status as OrderStatus] || 'help-circle-outline';
+  if (!status) return 'alert-circle-outline';
+  const normalized = normalizeOrderStatus(status);
+  return normalized ? STATUS_ICONS[normalized] : 'help-circle-outline';
 }
 
 /**

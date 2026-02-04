@@ -30,7 +30,7 @@ const rutasRoutes = require('./routes/rutas');
 const repartidoresRoutes = require('./routes/repartidores');
 const pagosRoutes = require('./routes/pagos');
 const cron = require('node-cron');
-const CheckoutReconciliationService = require('./services/checkoutReconciliationService');
+const CheckoutReconciliationService = require('./services/pagos/checkoutReconciliationService');
 
 // Controladores
 const PagoRedirectController = require('./controllers/pagoRedirectController');

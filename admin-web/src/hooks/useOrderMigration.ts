@@ -8,7 +8,6 @@ export interface MigrationOptions {
   codprefijo: string;
   codcomp: string;
   sucid: number;
-  iniciarPreparacion: boolean;
 }
 
 export interface MigrationResponse {
@@ -36,11 +35,6 @@ class OrderMigrationService {
 
   async migrateOrder(orderId: string, options: MigrationOptions): Promise<MigrationResponse> {
     const response = await migrationApiClient.post(`/orders/${orderId}/migrate`, options);
-    return response.data;
-  }
-
-  async iniciarPreparacion(orderId: string, options: MigrationOptions): Promise<MigrationResponse> {
-    const response = await migrationApiClient.post(`/orders/${orderId}/iniciar-preparacion`, options);
     return response.data;
   }
 
@@ -94,37 +88,6 @@ export function useMigrateOrder() {
   });
 }
 
-export function useIniciarPreparacion() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ orderId, options }: { orderId: string; options: MigrationOptions }) =>
-      orderMigrationService.iniciarPreparacion(orderId, options),
-    
-    onSuccess: (data, variables) => {
-      // Invalidar queries relacionadas
-      queryClient.invalidateQueries({ queryKey: ['order-migration', variables.orderId] });
-      queryClient.invalidateQueries({ queryKey: ['admin-order', variables.orderId] });
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-      
-      toast.success('🚀 Preparación iniciada exitosamente', {
-        duration: 4000,
-        position: 'top-right',
-      });
-      
-    },
-    
-    onError: (error: any) => {
-      console.error('❌ Error al iniciar preparación:', error);
-      
-      toast.error(`❌ Error al iniciar preparación: ${error.message}`, {
-        duration: 5000,
-        position: 'top-right',
-      });
-    },
-  });
-}
-
 export function useRetryMigration() {
   const queryClient = useQueryClient();
 
@@ -162,6 +125,7 @@ export function useMigrationStatus(orderId: string) {
   
   const migrationStatus = data?.data?.migrationStatus;
   const orden = data?.data?.orden;
+  const isConfirmada = orden?.estado === 'confirmada';
   
   const status = useMemo(() => {
     if (!migrationStatus) return 'unknown';
@@ -182,9 +146,8 @@ export function useMigrationStatus(orderId: string) {
     orden,
     isLoading,
     error,
-    canMigrate: status === 'pending' || status === 'error',
-    canRetry: status === 'error',
-    canIniciarPreparacion: status === 'completed' && orden?.tns_sincronizado === 'sincronizado',
+    canMigrate: isConfirmada && (status === 'pending' || status === 'error'),
+    canRetry: isConfirmada && status === 'error',
   };
 }
 

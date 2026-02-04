@@ -41,13 +41,13 @@ const crearRuta = async (repartidorId, nombre, descripcion, capacidadMaxima, ped
     }
 
     // Validar que los pedidos estén en estado adecuado para asignar
-    // Aceptar pedidos en: pendiente, confirmada, en_proceso, enviada
+    // Aceptar pedidos en: confirmada, en_proceso, enviada
     const placeholders = pedidosIds.map(() => '?').join(',');
     const [pedidos] = await connection.query(
       `SELECT id, estado, numero_orden 
        FROM ordenes 
        WHERE id IN (${placeholders}) 
-       AND estado IN ('pendiente', 'confirmada', 'en_proceso', 'enviada')`,
+       AND estado IN ('confirmada', 'en_proceso', 'enviada')`,
       pedidosIds
     );
 
@@ -341,6 +341,16 @@ const iniciarRuta = async (rutaId, repartidorId, esAdmin = false) => {
       `UPDATE entregas 
        SET estado = 'en_camino', fecha_salida = NOW() 
        WHERE ruta_id = ? AND estado = 'asignada'`,
+      [rutaId]
+    );
+
+    // Actualizar estado de órdenes a "enviada" al iniciar la ruta
+    await connection.query(
+      `UPDATE ordenes o
+       INNER JOIN ruta_pedidos rp ON rp.orden_id = o.id
+       SET o.estado = 'enviada', o.fecha_actualizacion = NOW()
+       WHERE rp.ruta_id = ?
+       AND o.estado NOT IN ('entregada', 'cancelada', 'reembolsada')`,
       [rutaId]
     );
 

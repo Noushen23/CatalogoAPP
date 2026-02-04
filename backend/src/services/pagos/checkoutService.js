@@ -1,6 +1,7 @@
 const { getConnection } = require('../../config/database');
 const Order = require('../../models/Order');
 const { v4: uuidv4 } = require('uuid');
+const config = require('../../config/env');
 
 class CheckoutService {
 
@@ -17,19 +18,21 @@ class CheckoutService {
       notas,
       datosCarrito,
       datosUsuario,
-      datosEnvio
+      datosEnvio,
+      fechaExpiracion
     } = datos;
 
     const intentId = uuidv4();
     const connection = await getConnection();
+    const fechaExpiracionFinal = fechaExpiracion || CheckoutService.calcularFechaExpiracion(metodoPago);
 
     try {
       const sql = `
         INSERT INTO checkout_intents (
           id, referencia_pago, usuario_id, carrito_id, direccion_envio_id,
           metodo_pago, notas, datos_carrito, datos_usuario, datos_envio,
-          estado_transaccion, fecha_creacion, fecha_actualizacion
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW(), NOW())
+          estado_transaccion, fecha_creacion, fecha_actualizacion, fecha_expiracion
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW(), NOW(), ?)
       `;
 
       await connection.execute(sql, [
@@ -42,18 +45,38 @@ class CheckoutService {
         notas || null,
         JSON.stringify(datosCarrito),
         JSON.stringify(datosUsuario),
-        datosEnvio ? JSON.stringify(datosEnvio) : null
+        datosEnvio ? JSON.stringify(datosEnvio) : null,
+        fechaExpiracionFinal
       ]);
 
       return {
         id: intentId,
         referenciaPago,
-        estado: 'PENDING'
+        estado: 'PENDING',
+        fechaExpiracion: fechaExpiracionFinal
       };
 
     } finally {
       connection.release();
     }
+  }
+
+  /* =====================================================
+   * CALCULAR FECHA DE EXPIRACIÓN POR MÉTODO DE PAGO
+   * ===================================================== */
+  static calcularFechaExpiracion(metodoPago, fechaBase = new Date()) {
+    const metodo = (metodoPago || '').toString().trim().toLowerCase();
+
+    let minutos = config.checkoutTimeouts?.defaultMinutes || 15;
+
+    if (metodo === 'tarjeta') minutos = config.checkoutTimeouts?.tarjetaMinutes || minutos;
+    if (metodo === 'pse') minutos = config.checkoutTimeouts?.pseMinutes || minutos;
+    if (metodo === 'nequi') minutos = config.checkoutTimeouts?.nequiMinutes || minutos;
+    if (metodo === 'bancolombia_transfer') minutos = config.checkoutTimeouts?.bancolombiaMinutes || minutos;
+
+    const fecha = new Date(fechaBase);
+    fecha.setMinutes(fecha.getMinutes() + Number(minutos || 15));
+    return fecha;
   }
 
   /* =====================================================
@@ -125,13 +148,20 @@ class CheckoutService {
 
       /* 2️⃣ Verificar si el pedido ya existe (idempotencia real) */
       const [ordenes] = await connection.execute(
-        `SELECT id FROM ordenes WHERE referencia_pago = ?`,
+        `SELECT id, estado FROM ordenes WHERE referencia_pago = ? FOR UPDATE`,
         [intent.referencia_pago]
       );
 
       if (ordenes.length) {
+        const ordenId = ordenes[0].id;
+        if (ordenes[0].estado !== 'confirmada') {
+          await connection.execute(
+            `UPDATE ordenes SET estado = 'confirmada', fecha_actualizacion = NOW() WHERE id = ?`,
+            [ordenId]
+          );
+        }
         await connection.commit();
-        return await Order.findById(ordenes[0].id);
+        return await Order.findById(ordenId);
       }
 
       /* 3️⃣ Parsear datos */
@@ -145,7 +175,8 @@ class CheckoutService {
         metodoPago: intent.metodo_pago,
         referenciaPago: intent.referencia_pago,
         notas: intent.notas || null,
-        items: datosCarrito.items
+        items: datosCarrito.items,
+        estado: 'confirmada'
       };
 
       const pedido = await Order.createFromCart(orderData, connection);

@@ -9,6 +9,10 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   nombreCompleto: string;
+  nombre: string;
+  segundoNombre?: string;
+  primerApellido: string;
+  segundoApellido?: string;
   password: string;
   telefono?: string;
   direccion?: string;
@@ -37,6 +41,10 @@ export interface User {
   id: string;
   email: string;
   nombreCompleto: string;
+  nombre?: string;
+  segundoNombre?: string;
+  primerApellido?: string;
+  segundoApellido?: string;
   telefono?: string;
   direccion?: string;
   tipoIdentificacion?: 'CC' | 'NIT' | 'CE' | 'TR';

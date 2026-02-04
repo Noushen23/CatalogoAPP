@@ -135,6 +135,8 @@ app.get('/api/materiales', auth, async (req, res) => {
                     COALESCE(MS.PRECIO1, 0) as PRECIO1,
                     COALESCE(MS.PRECIO2, 0) as PRECIO2,
                     COALESCE(MS.PRECIO3, 0) as PRECIO3,
+                    COALESCE(MS.PRECIO4, 0) as PRECIO4,
+                    COALESCE(MS.PRECIO5, 0) as PRECIO5,
                     COALESCE(MS.EXISTENC, 0) as EXISTEC,
                     S.NOMSUC as SUCURSAL_NOMBRE
                 FROM MATERIAL M
@@ -206,6 +208,8 @@ app.get('/api/materiales/:id', auth, async (req, res) => {
                        COALESCE(MS.PRECIO1, 0) as PRECIO1,
                        COALESCE(MS.PRECIO2, 0) as PRECIO2,
                        COALESCE(MS.PRECIO3, 0) as PRECIO3,
+                       COALESCE(MS.PRECIO4, 0) as PRECIO4,
+                       COALESCE(MS.PRECIO5, 0) as PRECIO5,
                        COALESCE(MS.EXISTENC, 0) as EXISTEC,
                        S.NOMSUC as SUCURSAL_NOMBRE
                 FROM MATERIAL M
@@ -274,6 +278,8 @@ app.get('/api/materiales/codigo/:codigo', auth, async (req, res) => {
                        COALESCE(MS.PRECIO1, 0) as PRECIO1,
                        COALESCE(MS.PRECIO2, 0) as PRECIO2,
                        COALESCE(MS.PRECIO3, 0) as PRECIO3,
+                       COALESCE(MS.PRECIO4, 0) as PRECIO4,
+                       COALESCE(MS.PRECIO5, 0) as PRECIO5,
                        COALESCE(MS.EXISTENC, 0) as EXISTEC,
                        S.NOMSUC as SUCURSAL_NOMBRE
                 FROM MATERIAL M

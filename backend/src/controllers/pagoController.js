@@ -1,5 +1,6 @@
 const wompiService = require('../services/pagos/wompiService');
 const Order = require('../models/Order');
+const emailService = require('../services/emailService');
 const { query } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 
@@ -64,6 +65,7 @@ class PagoController {
    * POST /api/v1/pagos/crear
    */
   static async crearTransaccion(req, res) {
+    let pedidoCreado = null;
     try {
       // Verificar que el usuario esté autenticado
       if (!req.user || !req.user.id) {
@@ -76,13 +78,14 @@ class PagoController {
       const userId = req.user.id;
       const {
         direccionEnvioId,
-        notas = null
+        notas = null,
+        metodoPago: metodoPagoBody = 'wompi'
         // NOTA: urlRedireccion y urlRedireccionError NO se extraen del body
         // El backend siempre usa las URLs configuradas en variables de entorno (WOMPI_URL_REDIRECCION, WOMPI_URL_REDIRECCION_ERROR)
       } = req.body;
 
-      // Único flujo soportado: Web Checkout
-      const metodoPago = 'checkout';
+      // Web Checkout: se guarda el método solicitado para calcular timeout y trazabilidad
+      const metodoPago = metodoPagoBody;
 
       console.log('🔍 [Pago] Crear transacción:', { userId, direccionEnvioId });
 
@@ -129,7 +132,7 @@ class PagoController {
         }
       }
 
-      const costoEnvio = Order.calcularCostoEnvio(subtotal, ciudadEnvio);
+      const costoEnvio = await Order.calcularCostoEnvio(subtotal, ciudadEnvio);
       const impuestos = 0;
       const descuento = 0;
       const total = subtotal - descuento + costoEnvio + impuestos;
@@ -177,9 +180,37 @@ class PagoController {
 
       // Convertir monto a centavos (Wompi espera el monto en centavos)
       const montoEnCentavos = Math.round(total * 100);
+
+      // Crear pedido desde el inicio con estado pendiente de pago
+      const orderItems = cart.items.map(item => ({
+        productId: item.productoId || item.productId,
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        subtotal: item.subtotal
+      }));
+
+      const orderData = {
+        usuarioId: userId,
+        cartId: cart.id,
+        direccionEnvioId: direccionEnvioId || null,
+        metodoPago,
+        referenciaPago: referencia,
+        notas: notas || null,
+        items: orderItems,
+        estado: 'pendiente'
+      };
+
+      pedidoCreado = await Order.createFromCart(orderData);
+      console.log('✅ [Pago] Pedido creado en estado pendiente:', {
+        pedidoId: pedidoCreado?.id,
+        numeroOrden: pedidoCreado?.numeroOrden,
+        referencia
+      });
       
       // Preparar datos del carrito para guardar en tabla temporal
       const datosCarrito = {
+        pedidoId: pedidoCreado?.id || null,
+        numeroOrden: pedidoCreado?.numeroOrden || null,
         items: cart.items.map(item => ({
           productId: item.productoId,
           productName: item.productoNombre,
@@ -205,13 +236,16 @@ class PagoController {
         numeroIdentificacion: usuario.numero_identificacion
       };
       
+      const CheckoutService = require('../services/pagos/checkoutService');
+      const fechaExpiracion = CheckoutService.calcularFechaExpiracion(metodoPago);
+      
       // Guardar intención de checkout en tabla temporal
       const checkoutIntentSql = `
         INSERT INTO checkout_intents (
           id, referencia_pago, usuario_id, carrito_id, direccion_envio_id,
           metodo_pago, notas, datos_carrito, datos_usuario, datos_envio,
-          estado_transaccion, fecha_creacion, fecha_actualizacion
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW(), NOW())
+          estado_transaccion, fecha_creacion, fecha_actualizacion, fecha_expiracion
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW(), NOW(), ?)
       `;
       
       await query(checkoutIntentSql, [
@@ -224,7 +258,8 @@ class PagoController {
         notas,
         JSON.stringify(datosCarrito),
         JSON.stringify(datosUsuario),
-        datosEnvio ? JSON.stringify(datosEnvio) : null
+        datosEnvio ? JSON.stringify(datosEnvio) : null,
+        fechaExpiracion
       ]);
       
       console.log('✅ [Pago] Intención de checkout guardada:', { referencia });
@@ -250,6 +285,13 @@ class PagoController {
       });
 
       if (!resultadoCheckout.exito) {
+        if (pedidoCreado?.id) {
+          try {
+            await Order.markPaymentFailed(pedidoCreado.id, 'Error al generar checkout de Wompi');
+          } catch (cleanupError) {
+            console.error('❌ [Pago] Error al revertir pedido tras fallo de Wompi:', cleanupError);
+          }
+        }
         return res.status(400).json({
           success: false,
           message: 'Error al generar URL de Web Checkout de Wompi',
@@ -275,15 +317,331 @@ class PagoController {
           monto: total,
           moneda: 'COP',
           transaccionId: transaccionId,
-          referencia: referencia
+          referencia: referencia,
+          pedidoId: pedidoCreado?.id || null,
+          numeroOrden: pedidoCreado?.numeroOrden || null
         }
       });
     } catch (error) {
+      if (pedidoCreado?.id) {
+        try {
+          await Order.markPaymentFailed(pedidoCreado.id, 'Error al iniciar el pago');
+        } catch (cleanupError) {
+          console.error('❌ [Pago] Error al revertir pedido tras fallo de checkout:', cleanupError);
+        }
+      }
       console.error('❌ [Pago] Error al crear transacción:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
         error: process.env.NODE_ENV === 'development' ? error.message : 'Error al procesar el pago'
+      });
+    }
+  }
+
+  /**
+   * Reintentar pago de un pedido fallido
+   * POST /api/v1/pagos/reintentar/:pedidoId
+   */
+  static async reintentarPago(req, res) {
+    let pedidoActualizado = null;
+    try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+      }
+
+      const userId = req.user.id;
+      const { pedidoId } = req.params;
+
+      if (!pedidoId) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de pedido es requerido'
+        });
+      }
+
+      const pedido = await Order.findById(pedidoId);
+      if (!pedido || pedido.usuarioId !== userId) {
+        return res.status(404).json({
+          success: false,
+          message: 'Pedido no encontrado'
+        });
+      }
+      const referenciaAnterior = pedido.referenciaPago || null;
+      const intentCountRows = await query(
+        `SELECT 
+            COUNT(*) AS total,
+            SUM(CASE WHEN estado_transaccion = 'APPROVED' THEN 1 ELSE 0 END) AS aprobadas
+         FROM checkout_intents
+         WHERE JSON_EXTRACT(datos_carrito, '$.pedidoId') = ?`,
+        [pedidoId]
+      );
+      const intentCount = intentCountRows.length ? Number(intentCountRows[0].total || 0) : 0;
+      const intentApproved = intentCountRows.length ? Number(intentCountRows[0].aprobadas || 0) : 0;
+
+      let legacyAttempts = 0;
+      let legacyApproved = 0;
+      if (referenciaAnterior) {
+        const legacyRows = await query(
+          `SELECT 
+              COUNT(*) AS total,
+              SUM(CASE WHEN estado_transaccion = 'APPROVED' THEN 1 ELSE 0 END) AS aprobadas
+           FROM checkout_intents
+           WHERE referencia_pago = ?`,
+          [referenciaAnterior]
+        );
+        legacyAttempts = legacyRows.length ? Number(legacyRows[0].total || 0) : 0;
+        legacyApproved = legacyRows.length ? Number(legacyRows[0].aprobadas || 0) : 0;
+      }
+
+      const totalAttempts = intentCount + (legacyAttempts > 0 ? 1 : 0);
+      const hasApproved = intentApproved > 0 || legacyApproved > 0;
+
+      if (hasApproved) {
+        return res.status(400).json({
+          success: false,
+          message: 'El pago ya fue confirmado. No se permite reintentar.'
+        });
+      }
+
+      if (totalAttempts >= 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Este checkout ya fue reintentado una vez y quedó bloqueado.'
+        });
+      }
+
+      if (pedido.estado !== 'cancelada' && pedido.estado !== 'pendiente') {
+        return res.status(400).json({
+          success: false,
+          message: 'El pedido no está en estado cancelada o pendiente'
+        });
+      }
+
+      if (pedido.estado === 'pendiente') {
+        // Si está pendiente, permitir reintento solo si expiró
+        const intentRows = await query(
+          `SELECT fecha_expiracion
+           FROM checkout_intents
+           WHERE referencia_pago = ?
+           ORDER BY fecha_creacion DESC
+           LIMIT 1`,
+          [pedido.referenciaPago]
+        );
+
+        const fechaExpiracion = intentRows.length && intentRows[0].fecha_expiracion
+          ? new Date(intentRows[0].fecha_expiracion)
+          : null;
+
+        if (!fechaExpiracion || fechaExpiracion > new Date()) {
+          return res.status(400).json({
+            success: false,
+            message: 'El pago aún está en proceso. Espera a que expire para reintentar.'
+          });
+        }
+
+        // Marcar como pago fallido para liberar stock antes del reintento
+        await Order.markPaymentFailed(pedido.id, 'Pago expirado');
+      }
+
+      if (pedido.estado === 'cancelada') {
+        const notas = (pedido.notas || '').toLowerCase();
+        if (notas && !notas.includes('pago fallido') && !notas.includes('pago')) {
+          return res.status(400).json({
+            success: false,
+            message: 'El pedido está cancelado y no puede reintentarse'
+          });
+        }
+      }
+
+      const usuarioSql = `
+        SELECT email, nombre_completo, telefono, tipo_identificacion, numero_identificacion
+        FROM usuarios
+        WHERE id = ?
+      `;
+      const usuarios = await query(usuarioSql, [userId]);
+      const usuario = usuarios && usuarios.length > 0 ? usuarios[0] : null;
+
+      if (!usuario) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+
+      const cliente = {
+        email: usuario.email,
+        nombre: usuario.nombre_completo || usuario.email,
+        telefono: usuario.telefono || '',
+        tipoIdentificacion: usuario.tipo_identificacion || 'CC',
+        numeroIdentificacion: usuario.numero_identificacion || ''
+      };
+
+      const transaccionId = uuidv4();
+      const transaccionIdCorto = transaccionId.replace(/-/g, '').substring(0, 8);
+      const timestamp = Date.now();
+      const referencia = `PED-${transaccionIdCorto}-${timestamp}`;
+
+      if (referencia.length > 40) {
+        throw new Error(`La referencia generada excede el límite de 40 caracteres de Wompi: ${referencia.length}`);
+      }
+
+      pedidoActualizado = await Order.preparePaymentRetry(pedidoId, referencia);
+      if (!pedidoActualizado) {
+        return res.status(404).json({
+          success: false,
+          message: 'Pedido no encontrado'
+        });
+      }
+
+      let direccionEnvio = null;
+      let datosEnvio = null;
+      if (pedidoActualizado.direccionEnvio) {
+        const mapped = mapDireccionEnvio({
+          nombre_destinatario: pedidoActualizado.direccionEnvio.nombreDestinatario,
+          telefono: pedidoActualizado.direccionEnvio.telefono,
+          direccion: pedidoActualizado.direccionEnvio.direccion,
+          ciudad: pedidoActualizado.direccionEnvio.ciudad,
+          departamento: pedidoActualizado.direccionEnvio.departamento,
+          codigo_postal: pedidoActualizado.direccionEnvio.codigoPostal,
+          pais: pedidoActualizado.direccionEnvio.pais,
+          instrucciones: pedidoActualizado.direccionEnvio.instrucciones
+        });
+        direccionEnvio = mapped.direccionEnvio;
+        datosEnvio = mapped.datosEnvio;
+      }
+
+      const items = (pedidoActualizado.items || []).map(item => ({
+        productId: item.productId || item.productoId,
+        productName: item.nombreProducto || item.productName,
+        productDescription: item.productDescription,
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        subtotal: item.subtotal,
+        imageUrl: item.imageUrl
+      }));
+
+      const datosCarrito = {
+        pedidoId: pedidoActualizado.id,
+        numeroOrden: pedidoActualizado.numeroOrden,
+        items,
+        subtotal: pedidoActualizado.subtotal,
+        costoEnvio: pedidoActualizado.costoEnvio,
+        impuestos: pedidoActualizado.impuestos,
+        descuento: pedidoActualizado.descuento,
+        total: pedidoActualizado.total
+      };
+
+      const datosUsuario = {
+        email: usuario.email,
+        nombreCompleto: usuario.nombre_completo,
+        telefono: usuario.telefono,
+        tipoIdentificacion: usuario.tipo_identificacion,
+        numeroIdentificacion: usuario.numero_identificacion
+      };
+
+      const CheckoutService = require('../services/pagos/checkoutService');
+      let carritoId = null;
+      if (referenciaAnterior) {
+        const intentRows = await query(
+          `SELECT carrito_id
+           FROM checkout_intents
+           WHERE referencia_pago = ?
+           ORDER BY fecha_creacion DESC
+           LIMIT 1`,
+          [referenciaAnterior]
+        );
+        carritoId = intentRows.length ? intentRows[0].carrito_id : null;
+      }
+
+      if (!carritoId) {
+        const nuevoCarritoId = uuidv4();
+        await query(
+          `INSERT INTO carritos (id, usuario_id, activo) VALUES (?, ?, ?)`,
+          [nuevoCarritoId, userId, false]
+        );
+        carritoId = nuevoCarritoId;
+      }
+
+      await CheckoutService.crearIntencion({
+        referenciaPago: referencia,
+        usuarioId: userId,
+        carritoId,
+        direccionEnvioId: pedidoActualizado.direccionEnvioId || null,
+        metodoPago: pedidoActualizado.metodoPago,
+        notas: pedidoActualizado.notas || null,
+        datosCarrito,
+        datosUsuario,
+        datosEnvio
+      });
+
+      const resultadoCheckout = await wompiService.generarUrlWebCheckout({
+        referencia,
+        monto: Math.round(pedidoActualizado.total * 100),
+        moneda: 'COP',
+        cliente,
+        metodoPago: null,
+        urlRedireccion: undefined,
+        urlRedireccionError: undefined,
+        direccionEnvio,
+        impuestos: null
+      });
+
+      if (!resultadoCheckout.exito) {
+        await Order.markPaymentFailed(pedidoActualizado.id, 'Error al generar checkout de Wompi');
+        return res.status(400).json({
+          success: false,
+          message: 'Error al generar URL de Web Checkout de Wompi',
+          error: resultadoCheckout.error,
+          detalles: resultadoCheckout.detalles
+        });
+      }
+
+      const urlCheckoutFinal = resultadoCheckout.datos.urlCheckout;
+
+      return res.status(201).json({
+        success: true,
+        message: 'Reintento de pago iniciado',
+        data: {
+          urlCheckout: urlCheckoutFinal,
+          referencia,
+          urlRedireccion: resultadoCheckout.datos.redirectUrl,
+          urlRedireccionError: resultadoCheckout.datos.redirectUrlError,
+          metodoPago: pedidoActualizado.metodoPago,
+          monto: pedidoActualizado.total,
+          moneda: 'COP',
+          transaccionId,
+          pedidoId: pedidoActualizado.id,
+          numeroOrden: pedidoActualizado.numeroOrden
+        }
+      });
+    } catch (error) {
+      const errorMessage = error?.message || 'Error al reintentar el pago';
+      if (
+        errorMessage.includes('Stock insuficiente') ||
+        errorMessage.includes('Producto no disponible')
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: errorMessage
+        });
+      }
+
+      if (pedidoActualizado?.id) {
+        try {
+          await Order.markPaymentFailed(pedidoActualizado.id, 'Error al reintentar el pago');
+        } catch (cleanupError) {
+          console.error('❌ [Pago] Error al revertir pedido tras fallo de reintento:', cleanupError);
+        }
+      }
+      console.error('❌ [Pago] Error al reintentar pago:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: process.env.NODE_ENV === 'development' ? errorMessage : 'Error al reintentar el pago'
       });
     }
   }
@@ -315,7 +673,7 @@ class PagoController {
         });
       }
 
-      // Si la transacción está aprobada, actualizar/crear el pedido (fallback si el webhook falló)
+      // Si la transacción está aprobada, actualizar/confirmar el pedido (fallback si el webhook falló)
       if (resultado.datos.estado === 'APPROVED') {
         const CheckoutService = require('../services/pagos/checkoutService');
         const referenciaPago = resultado.datos.referencia;
@@ -323,12 +681,27 @@ class PagoController {
         // Sincronizar intención y crear pedido si aún no existe
         const checkoutIntent = await CheckoutService.obtenerIntencionPorReferencia(referenciaPago);
         if (checkoutIntent) {
+          const pedidoPrevio = await Order.findByReference(referenciaPago, userId);
+          const estadoAnterior = pedidoPrevio?.estado || 'pendiente';
+
           await CheckoutService.actualizarEstado(
             checkoutIntent.id,
             'APPROVED',
             resultado.datos.id || idTransaccion
           );
-          await CheckoutService.confirmarCheckout(checkoutIntent.id);
+          const pedidoConfirmado = await CheckoutService.confirmarCheckout(checkoutIntent.id);
+
+          if (estadoAnterior !== 'confirmada' && pedidoConfirmado?.usuario?.email) {
+            await emailService.sendOrderStatusUpdateEmail(
+              pedidoConfirmado.usuario.email,
+              pedidoConfirmado.usuario.nombreCompleto || 'Usuario',
+              pedidoConfirmado.numeroOrden,
+              pedidoConfirmado.estado,
+              estadoAnterior,
+              pedidoConfirmado.total,
+              pedidoConfirmado.fechaCreacion
+            );
+          }
         }
 
         // Buscar pedido por referencia
@@ -351,8 +724,49 @@ class PagoController {
               WHERE id = ?
             `;
             await query(actualizarPedidoSql, [pedido.id]);
+            const pedidoConfirmado = await Order.findById(pedido.id);
+            if (pedidoConfirmado?.usuario?.email) {
+              await emailService.sendOrderStatusUpdateEmail(
+                pedidoConfirmado.usuario.email,
+                pedidoConfirmado.usuario.nombreCompleto || 'Usuario',
+                pedidoConfirmado.numeroOrden,
+                pedidoConfirmado.estado,
+                'pendiente',
+                pedidoConfirmado.total,
+                pedidoConfirmado.fechaCreacion
+              );
+            }
             
             console.log('✅ [Pago] Pedido actualizado a confirmada:', pedido.id);
+          }
+        }
+      }
+
+      // Si la transacción fue rechazada, marcar pedido como pago fallido (fallback)
+      if (['DECLINED', 'VOIDED', 'ERROR'].includes(resultado.datos.estado)) {
+        const referenciaPago = resultado.datos.referencia;
+        const pedidos = await query(
+          `SELECT id, estado FROM ordenes WHERE referencia_pago = ? AND usuario_id = ?`,
+          [referenciaPago, userId]
+        );
+
+        if (pedidos.length > 0) {
+          const pedido = pedidos[0];
+          if (pedido.estado === 'pendiente') {
+            await Order.markPaymentFailed(pedido.id, 'Pago rechazado o fallido');
+            const pedidoActualizado = await Order.findById(pedido.id);
+            if (pedidoActualizado?.usuario?.email) {
+              await emailService.sendOrderStatusUpdateEmail(
+                pedidoActualizado.usuario.email,
+                pedidoActualizado.usuario.nombreCompleto || 'Usuario',
+                pedidoActualizado.numeroOrden,
+                pedidoActualizado.estado,
+                'pendiente',
+                pedidoActualizado.total,
+                pedidoActualizado.fechaCreacion
+              );
+            }
+            console.log('❌ [Pago] Pedido marcado como pago fallido:', pedido.id);
           }
         }
       }
@@ -442,14 +856,16 @@ class PagoController {
       // Procesar solo eventos de transacciones finalizadas
       if (evento === 'transaction.updated' || evento === 'transaction.created') {
         if (estadoTransaccion === 'APPROVED') {
-          // Transacción aprobada - Confirmar checkout y crear pedido
+          // Transacción aprobada - Confirmar checkout y actualizar pedido
           try {
+            const pedidoPrevio = await Order.findByReference(referencia, checkoutIntent.usuario_id);
+            const estadoAnterior = pedidoPrevio?.estado || 'pendiente';
             const pedido = await CheckoutService.confirmarCheckout(checkoutIntent.id);
             
-            console.log('✅ [Pago] Pedido creado desde webhook (pago aprobado):', {
+            console.log('✅ [Pago] Pedido confirmado desde webhook (pago aprobado):', {
               pedidoId: pedido.id,
               numeroOrden: pedido.numeroOrden,
-              estado: pedido.estado, // Debe ser "pendiente"
+              estado: pedido.estado,
               checkoutIntentId: checkoutIntent.id,
               idTransaccion: idTransaccionWompi,
               referencia: referencia,
@@ -457,9 +873,21 @@ class PagoController {
             });
             
             // Responder 200 para confirmar a Wompi que recibimos el webhook
+            if (estadoAnterior !== 'confirmada' && pedido?.usuario?.email) {
+              await emailService.sendOrderStatusUpdateEmail(
+                pedido.usuario.email,
+                pedido.usuario.nombreCompleto || 'Usuario',
+                pedido.numeroOrden,
+                pedido.estado,
+                estadoAnterior,
+                pedido.total,
+                pedido.fechaCreacion
+              );
+            }
+
             return res.json({
               success: true,
-              message: 'Webhook procesado exitosamente - Pedido creado',
+              message: 'Webhook procesado exitosamente - Pedido confirmado',
               pedidoId: pedido.id,
               estado: pedido.estado
             });
@@ -474,18 +902,38 @@ class PagoController {
           }
         } else if (estadoTransaccion === 'DECLINED' || estadoTransaccion === 'VOIDED' || estadoTransaccion === 'ERROR') {
           // Transacción rechazada, anulada o con error
-          // NO crear el pedido, solo registrar el rechazo (ya registrado arriba)
-          console.log('❌ [Pago] Pago rechazado - NO se creará pedido:', {
-            checkoutIntentId: checkoutIntent.id,
-            estadoTransaccion: estadoTransaccion,
-            referencia: referencia,
-            mensaje: resultado.datos.mensaje || 'Pago rechazado o fallido'
-          });
-          
-          // Responder 200 para confirmar a Wompi que recibimos el webhook
+          try {
+            const pedido = await Order.findByReference(referencia, checkoutIntent.usuario_id);
+            if (pedido) {
+              const estadoAnterior = pedido.estado;
+              await Order.markPaymentFailed(pedido.id, 'Pago rechazado o fallido');
+              const pedidoActualizado = await Order.findById(pedido.id);
+              if (estadoAnterior !== 'cancelada' && pedidoActualizado?.usuario?.email) {
+                await emailService.sendOrderStatusUpdateEmail(
+                  pedidoActualizado.usuario.email,
+                  pedidoActualizado.usuario.nombreCompleto || 'Usuario',
+                  pedidoActualizado.numeroOrden,
+                  pedidoActualizado.estado,
+                  estadoAnterior,
+                  pedidoActualizado.total,
+                  pedidoActualizado.fechaCreacion
+                );
+              }
+              console.log('❌ [Pago] Pedido marcado como pago fallido:', {
+                pedidoId: pedido.id,
+                referencia,
+                estadoTransaccion
+              });
+            } else {
+              console.warn('⚠️ [Pago] Pedido no encontrado para marcar pago fallido:', { referencia });
+            }
+          } catch (errorEstado) {
+            console.error('❌ [Pago] Error al marcar pago fallido:', errorEstado);
+          }
+
           return res.json({
             success: true,
-            message: 'Webhook procesado exitosamente - Pago rechazado, pedido no creado',
+            message: 'Webhook procesado exitosamente - Pago rechazado',
             estadoTransaccion: estadoTransaccion
           });
         } else if (estadoTransaccion === 'PENDING') {
@@ -529,6 +977,39 @@ class PagoController {
 
   
   /**
+   * Obtener lista de bancos disponibles para PSE
+   * GET /api/v1/pagos/bancos-pse
+   */
+  static async obtenerBancosPSE(req, res) {
+    try {
+      // Consultar bancos PSE a Wompi
+      const resultado = await wompiService.obtenerBancosPSE();
+
+      if (!resultado.exito) {
+        return res.status(400).json({
+          success: false,
+          message: 'Error al obtener bancos PSE',
+          error: resultado.error,
+          detalles: resultado.detalles || null
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Bancos PSE obtenidos exitosamente',
+        data: resultado.datos
+      });
+    } catch (error) {
+      console.error('❌ [Pago] Error al obtener bancos PSE:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Error al obtener bancos PSE'
+      });
+    }
+  }
+
+  /**
    * Obtener configuración pública de Wompi (para frontend)
    * GET /api/v1/pagos/configuracion
    */
@@ -570,14 +1051,21 @@ class PagoController {
       // Verificar que el pedido pertenece al usuario
       const pedidoSql = `
         SELECT 
-          id,
-          numero_orden,
-          estado,
-          referencia_pago,
-          fecha_creacion,
-          TIMESTAMPDIFF(SECOND, fecha_creacion, NOW()) as segundos_transcurridos
-        FROM ordenes
-        WHERE id = ? AND usuario_id = ?
+          o.id,
+          o.numero_orden,
+          o.estado,
+          o.referencia_pago,
+          o.metodo_pago,
+          o.fecha_creacion,
+          TIMESTAMPDIFF(SECOND, o.fecha_creacion, NOW()) as segundos_transcurridos,
+          ci.fecha_expiracion,
+          ci.metodo_pago as metodo_pago_intent
+        FROM ordenes o
+        LEFT JOIN checkout_intents ci
+          ON ci.referencia_pago = o.referencia_pago
+        WHERE o.id = ? AND o.usuario_id = ?
+        ORDER BY ci.fecha_creacion DESC
+        LIMIT 1
       `;
       const pedidos = await query(pedidoSql, [pedidoId, userId]);
 
@@ -603,9 +1091,16 @@ class PagoController {
         });
       }
 
-      const TIMEOUT_SECONDS = 2 * 60; // 2 minutos en segundos
+      const CheckoutService = require('../services/pagos/checkoutService');
+      const metodoPago = pedido.metodo_pago_intent || pedido.metodo_pago || 'wompi';
+      const fechaBase = pedido.fecha_creacion ? new Date(pedido.fecha_creacion) : new Date();
+      const fechaExpiracion = pedido.fecha_expiracion
+        ? new Date(pedido.fecha_expiracion)
+        : CheckoutService.calcularFechaExpiracion(metodoPago, fechaBase);
+
+      const ahora = new Date();
       const segundosTranscurridos = pedido.segundos_transcurridos || 0;
-      const segundosRestantes = Math.max(0, TIMEOUT_SECONDS - segundosTranscurridos);
+      const segundosRestantes = Math.max(0, Math.floor((fechaExpiracion.getTime() - ahora.getTime()) / 1000));
       const expirado = segundosRestantes === 0;
 
       return res.json({
@@ -617,7 +1112,8 @@ class PagoController {
           expirado: expirado,
           estado: pedido.estado,
           minutosRestantes: Math.ceil(segundosRestantes / 60),
-          segundosRestantes: segundosRestantes % 60
+          segundosRestantes: segundosRestantes % 60,
+          fechaExpiracion: fechaExpiracion
         }
       });
 

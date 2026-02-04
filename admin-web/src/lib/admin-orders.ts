@@ -206,11 +206,12 @@ export const AdminOrdersService = {
   async updateOrderStatus(
     orderId: string, 
     newStatus: OrderStatus, 
-    notas?: string
+    notas?: string,
+    forceSyncTercero?: boolean
   ): Promise<ApiResponse<AdminOrderDetail>> {
     const response = await apiClient.put<ApiResponse<AdminOrderDetail>>(
       `/orders/${orderId}/status`,
-      { estado: newStatus, notas }
+      { estado: newStatus, notas, forceSyncTercero }
     );
     return response.data;
   },

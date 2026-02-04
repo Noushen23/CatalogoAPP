@@ -108,6 +108,9 @@ class ApiClient {
           JSON.stringify(error.response?.data, null, 2)
         );
 
+
+
+        
         if (error.response?.status === 401) {
           const errorUrl = error.config?.url || '';
           const isAuthEndpoint = errorUrl.includes('/auth/login') || errorUrl.includes('/auth/register');

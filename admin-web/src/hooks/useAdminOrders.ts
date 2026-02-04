@@ -17,6 +17,7 @@ export function useAdminOrders(filters?: OrderFilters) {
   });
 }
 
+// ===== Queries individuales =====
 /**
  * Hook para obtener un pedido específico por ID con cache inteligente
  */
@@ -33,6 +34,7 @@ export function useAdminOrder(orderId: string) {
   });
 }
 
+// ===== Queries de métricas =====
 /**
  * Hook para obtener estadísticas de pedidos con cache inteligente
  */
@@ -63,6 +65,7 @@ export function useRecentOrders(limit: number = 5) {
   });
 }
 
+// ===== Mutations =====
 /**
  * Hook para actualizar el estado de un pedido con actualización optimista
  */
@@ -74,11 +77,19 @@ export function useUpdateOrderStatus() {
       orderId,
       newStatus,
       notas,
+      forceSyncTercero,
     }: {
       orderId: string;
       newStatus: OrderStatus;
       notas?: string;
-    }) => AdminOrdersService.updateOrderStatus(orderId, newStatus, notas),
+      forceSyncTercero?: boolean;
+    }) =>
+      AdminOrdersService.updateOrderStatus(
+        orderId,
+        newStatus,
+        notas,
+        forceSyncTercero
+      ),
     
     // Actualización optimista - actualiza la UI inmediatamente
     onMutate: async ({ orderId, newStatus, notas }) => {
@@ -178,7 +189,7 @@ export function useUpdateOrderStatus() {
       // Si se confirmó el pedido y se sincronizó con ApiTercero
       if (variables.newStatus === 'confirmada' && data?.terceroSincronizado) {
         toast.success(
-          `🎯 Cliente sincronizado con TNS${data.terceroNombre ? `: ${data.terceroNombre}` : ''}`,
+          `🎯 Tercero sincronizado con TNS${data.terceroNombre ? `: ${data.terceroNombre}` : ''}. Por favor revisar la información en TNS.`,
           {
             duration: 4000,
             position: 'top-right',

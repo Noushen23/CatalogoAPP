@@ -47,6 +47,7 @@ const statusLabels = {
 };
 
 const paymentMethodLabels = {
+  wompi: "Wompi",
   tarjeta: "Tarjeta",
   pse: "PSE",
   nequi: "Nequi",
@@ -544,6 +545,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
         orderId: order.id,
         newStatus: "confirmada",
         notas: "Tercero migrado y pedido confirmado",
+        forceSyncTercero: true,
       });
       toast.success("✅ Tercero migrado exitosamente. Pedido confirmado.", {
         duration: 4000,
@@ -569,20 +571,33 @@ function OrderDetail({ orderId }: { orderId: string }) {
       await migrateOrderMutation.mutateAsync({
         orderId: order.id,
         options: {
-          iniciarPreparacion: true,
           usuario: order.usuario?.email || "",
           codprefijo: "1",
           codcomp: "PV",
           sucid: 1,
         },
       });
-      toast.success(
-        "✅ Pedido migrado a TNS exitosamente. Preparación iniciada.",
-        {
-          duration: 4000,
-          position: "top-right",
+      if (order.estado !== "en_proceso") {
+        try {
+          await updateStatusMutation.mutateAsync({
+            orderId: order.id,
+            newStatus: "en_proceso",
+            notas: "Pedido migrado a TNS",
+          });
+        } catch (statusError: any) {
+          toast.error(
+            "⚠️ Pedido migrado, pero no se pudo actualizar el estado a En Proceso.",
+            {
+              duration: 5000,
+              position: "top-right",
+            }
+          );
         }
-      );
+      }
+      toast.success("✅ Pedido migrado a TNS exitosamente.", {
+        duration: 4000,
+        position: "top-right",
+      });
     } catch (error: any) {
       toast.error(
         "❌ Error al migrar a TNS. Verifique la conexión con ApiPedidoVenta.",
@@ -594,7 +609,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
     } finally {
       setIsProcessing(false);
     }
-  }, [order.id, isProcessing, migrateOrderMutation]);
+  }, [order.id, order.estado, isProcessing, migrateOrderMutation, updateStatusMutation]);
 
   const handleSequentialAction = useCallback(
     async (
@@ -732,10 +747,10 @@ function OrderDetail({ orderId }: { orderId: string }) {
       case "pendiente":
         actions.push(
           {
-            status: "pendiente",
-            label: "Migrar Tercero",
-            color: "bg-orange-600 hover:bg-orange-700",
-            action: "migrate_tercero",
+            status: "confirmada",
+            label: "Confirmar Pedido",
+            color: "bg-blue-600 hover:bg-blue-700",
+            action: "normal",
           },
           {
             status: "cancelada",
@@ -747,7 +762,13 @@ function OrderDetail({ orderId }: { orderId: string }) {
         break;
       case "confirmada":
         actions.push(
-          // { status: 'confirmada', label: 'Migrar a TNS', color: 'bg-indigo-600 hover:bg-indigo-700', action: 'migrate_tns' },
+          {
+            status: "confirmada",
+            label: "Migrar Tercero",
+            color: "bg-orange-600 hover:bg-orange-700",
+            action: "migrate_tercero",
+          },
+   
           {
             status: "cancelada",
             label: "Cancelar",

@@ -200,7 +200,7 @@ class OrderAdminController {
   static async updateOrderStatus(req, res) {
     try {
       const { id } = req.params;
-      const { estado, notas = null } = req.body;
+      const { estado, notas = null, forceSyncTercero = false } = req.body;
 
       const order = await Order.findById(id);
       
@@ -220,7 +220,8 @@ class OrderAdminController {
       // ⭐ INTEGRACIÓN CON APITERCERO ⭐
       // Si el nuevo estado es 'confirmada' y el estado anterior NO era 'confirmada'
       // entonces sincronizamos el usuario con el sistema de terceros
-      if (estado === 'confirmada' && estadoAnterior !== 'confirmada') {
+      // Permitir re-sincronizar el tercero si se solicita explícitamente
+      if (estado === 'confirmada' && (estadoAnterior !== 'confirmada' || forceSyncTercero)) {
         try {
           console.log(`\n🔄 Estado cambiando a 'confirmada', sincronizando con ApiTercero...`);
           

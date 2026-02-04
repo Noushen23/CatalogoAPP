@@ -259,7 +259,7 @@ class NotificationService {
 
       // Mapear estados a mensajes amigables
       const statusMessages = {
-        'pendiente': 'Tu pedido #{{orderNumber}} está siendo procesado',
+        'pendiente': 'Tu pedido #{{orderNumber}} está pendiente de pago',
         'confirmada': 'Tu pedido #{{orderNumber}} ha sido confirmado',
         'en_proceso': 'Tu pedido #{{orderNumber}} está en preparación',
         'enviada': '¡Tu pedido #{{orderNumber}} ha sido enviado!',

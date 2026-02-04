@@ -6,8 +6,8 @@
 module.exports = {
     // Configuración del servidor
     server: {
-        port: process.env.PORT || 51255,
-        host: process.env.HOST || '192.168.3.6',
+        port: process.env.PORT || 51252,
+        host: process.env.HOST || '192.168.3.104',
         environment: process.env.NODE_ENV || 'development'
     },
 

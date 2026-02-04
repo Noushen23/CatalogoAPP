@@ -528,8 +528,8 @@ class EmailService {
   createOrderStatusUpdateEmailTemplate(nombre, numeroOrden, estado, estadoAnterior, total, fechaCreacion) {
     const statusMessages = {
       'pendiente': {
-        title: '⏳ Pedido en Proceso',
-        message: 'Tu pedido está siendo procesado. Te notificaremos cuando sea confirmado.',
+        title: '⏳ Pedido pendiente de pago',
+        message: 'Tu pedido está pendiente de pago. Completa el pago para continuar con el proceso.',
         color: '#ff9800'
       },
       'confirmada': {
@@ -571,7 +571,7 @@ class EmailService {
     };
 
     const statusLabels = {
-      'pendiente': 'Pendiente',
+      'pendiente': 'Pendiente de pago',
       'confirmada': 'Confirmada',
       'en_proceso': 'En Proceso',
       'enviada': 'Enviada',

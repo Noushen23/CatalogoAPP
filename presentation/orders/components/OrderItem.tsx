@@ -7,6 +7,8 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/presentation/theme/components/ThemedText';
 import { ThemedView } from '@/presentation/theme/components/ThemedView';
@@ -14,6 +16,7 @@ import { useThemeColor } from '@/presentation/theme/hooks/useThemeColor';
 import { OrderSimple } from '@/core/api/ordersApi';
 import { formatDate, formatCurrency } from '@/presentation/utils';
 import { getOrderStatusColor, getOrderStatusText, getOrderStatusIcon } from '@/presentation/orders/utils';
+import { useReintentarPago } from '@/presentation/pagos/hooks/usePagos';
 
 interface OrderItemProps {
   order: OrderSimple;
@@ -29,11 +32,58 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   const tintColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
   const cardBackground = useThemeColor({}, 'cardBackground');
+  const router = useRouter();
+  const reintentarPagoMutation = useReintentarPago();
 
   // Usar utilidades centralizadas para los estados
   const statusColor = getOrderStatusColor(order.estado);
   const statusText = getOrderStatusText(order.estado);
   const statusIcon = getOrderStatusIcon(order.estado);
+  const estadoNormalizado = (order.estado || '').toString().trim().toLowerCase();
+  const showRetryPayment = [
+    'cancelada',
+    'cancelado',
+    'canceled',
+    'cancelled',
+    'pago_fallido',
+    'fallido',
+    'error',
+    'failed',
+  ].includes(estadoNormalizado);
+
+  const handleRetryPayment = async () => {
+    try {
+      const transaccionResult = await reintentarPagoMutation.mutateAsync({
+        pedidoId: order.id,
+      });
+
+      if (transaccionResult?.urlCheckout) {
+        try {
+          await SecureStore.setItemAsync('wompi_checkout_url', transaccionResult.urlCheckout);
+          if (transaccionResult.referencia) {
+            await SecureStore.setItemAsync('wompi_checkout_ref', transaccionResult.referencia);
+          }
+        } catch (storeError) {
+          console.warn('⚠️ [Pago] No se pudo guardar URL en SecureStore:', storeError);
+        }
+
+        router.push({
+          pathname: '/(customer)/wompi-checkout',
+          params: {
+            transaccionId: transaccionResult.transaccionId,
+            urlCheckout: transaccionResult.urlCheckout,
+            referencia: transaccionResult.referencia,
+            pedidoId: transaccionResult.pedidoId,
+          },
+        });
+      } else {
+        throw new Error('No se recibió URL de checkout de Wompi');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'No se pudo reintentar el pago';
+      Alert.alert('Error al Reintentar Pago', errorMessage, [{ text: 'Entendido' }]);
+    }
+  };
 
   return (
     <TouchableOpacity
@@ -75,11 +125,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
         <View style={styles.paymentInfo}>
           <Ionicons name="card-outline" size={16} color="#666" />
           <ThemedText style={styles.paymentText}>
-            {order.metodoPago === 'tarjeta' ? 'Tarjeta' :
-             order.metodoPago === 'pse' ? 'PSE' :
-             order.metodoPago === 'nequi' ? 'Nequi' :
-             order.metodoPago === 'bancolombia_transfer' ? 'Bancolombia' :
-             order.metodoPago ? order.metodoPago.charAt(0).toUpperCase() + order.metodoPago.slice(1).replace('_', ' ') : 'No especificado'}
+            Wompi
           </ThemedText>
         </View>
       </View>
@@ -90,6 +136,22 @@ export const OrderItem: React.FC<OrderItemProps> = ({
           {formatCurrency(order.total)}
         </ThemedText>
       </View>
+      {showRetryPayment && (
+        <TouchableOpacity
+          style={[styles.retryPaymentButton, { backgroundColor: tintColor }]}
+          onPress={(event) => {
+            event.stopPropagation();
+            handleRetryPayment();
+          }}
+          disabled={reintentarPagoMutation.isPending}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="refresh" size={14} color="white" />
+          <ThemedText style={styles.retryPaymentButtonText}>
+            Reintentar pago
+          </ThemedText>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.arrowContainer}>
         <Ionicons name="chevron-forward" size={20} color="#ccc" />
@@ -190,6 +252,23 @@ const styles = StyleSheet.create({
   totalAmount: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  retryPaymentButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  retryPaymentButtonText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   arrowContainer: {
     position: 'absolute',

@@ -17,6 +17,7 @@ import { useUserOrder } from '@/presentation/orders/hooks/useOrders';
 import { Order, OrderItem } from '@/core/api/ordersApi';
 import { formatDateTime, formatCurrency } from '@/presentation/utils';
 import { getOrderStatusColor, getOrderStatusText, getOrderStatusIcon } from '@/presentation/orders/utils';
+import { useCheckoutStatus } from '@/presentation/pagos/hooks/usePagos';
 
 export default function OrderConfirmationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -89,6 +90,14 @@ export default function OrderConfirmationScreen() {
 
   // TypeScript ahora sabe que order es de tipo Order
   const orderData = order as Order;
+  const { data: checkoutStatus } = useCheckoutStatus(
+    orderData?.id || null,
+    orderData?.estado === 'pendiente'
+  );
+  const checkoutExpirado = Boolean(checkoutStatus?.expirado);
+  const estadoNormalizado = (orderData?.estado || '').toString().trim().toLowerCase();
+  const isFailedStatus = ['fallido', 'error', 'failed', 'pago_fallido'].includes(estadoNormalizado);
+  const isCancelledStatus = ['cancelada', 'cancelado', 'canceled', 'cancelled'].includes(estadoNormalizado);
 
   return (
     <ThemedView style={styles.container}>
@@ -98,7 +107,15 @@ export default function OrderConfirmationScreen() {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         
-        <ThemedText style={styles.headerTitle}>Pedido Confirmado</ThemedText>
+        <ThemedText style={styles.headerTitle}>
+          {estadoNormalizado === 'pendiente'
+            ? 'Pedido Pendiente'
+            : isCancelledStatus
+              ? 'Pedido Cancelado'
+              : estadoNormalizado === 'confirmada'
+                ? 'Pedido Confirmado'
+                : 'Detalle del Pedido'}
+        </ThemedText>
         
         <View style={styles.headerRight} />
       </View>
@@ -128,9 +145,8 @@ export default function OrderConfirmationScreen() {
               </ThemedText>
             </View>
           </View>
-
           {/* Mensaje según el estado del pedido */}
-          {orderData.estado === 'pendiente' ? (
+          {estadoNormalizado === 'pendiente' ? (
             <View style={styles.pendingMessage}>
               <Ionicons name="time-outline" size={24} color="#FF9800" />
               <View style={styles.pendingTextContainer}>
@@ -142,21 +158,23 @@ export default function OrderConfirmationScreen() {
                 </ThemedText>
               </View>
             </View>
-          ) : orderData.estado === 'confirmada' || orderData.estado === 'en_proceso' || orderData.estado === 'enviada' || orderData.estado === 'entregada' ? (
+          ) : isFailedStatus || isCancelledStatus ? (
+            <View style={styles.errorMessage}>
+              <Ionicons name="alert-circle-outline" size={24} color="#F44336" />
+              <View style={styles.pendingTextContainer}>
+                <ThemedText style={styles.errorMessageText}>
+                  Tu pedido fue cancelado. Puedes reintentar el pago desde el detalle del pedido.
+                </ThemedText>
+              </View>
+            </View>
+          ) : estadoNormalizado === 'confirmada' || estadoNormalizado === 'en_proceso' || estadoNormalizado === 'enviada' || estadoNormalizado === 'entregada' ? (
             <View style={styles.successMessage}>
               <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
               <ThemedText style={styles.successText}>
                 Tu pedido ha sido procesado exitosamente. Te enviaremos una confirmación por correo electrónico.
               </ThemedText>
             </View>
-          ) : orderData.estado === 'cancelada' ? (
-            <View style={styles.errorMessage}>
-              <Ionicons name="close-circle-outline" size={24} color="#F44336" />
-              <ThemedText style={styles.errorMessageText}>
-                Tu pedido ha sido cancelado.
-              </ThemedText>
-            </View>
-          ) : orderData.estado === 'reembolsada' ? (
+          ) : estadoNormalizado === 'reembolsada' ? (
             <View style={styles.infoMessage}>
               <Ionicons name="refresh-outline" size={24} color="#607D8B" />
               <ThemedText style={styles.infoMessageText}>
@@ -190,11 +208,11 @@ export default function OrderConfirmationScreen() {
             <View style={styles.infoItem}>
               <ThemedText style={styles.infoLabel}>Método de Pago</ThemedText>
               <ThemedText style={styles.infoValue}>
-                {orderData.metodoPago === 'tarjeta' ? 'Tarjeta' :
-                 orderData.metodoPago === 'pse' ? 'PSE' :
-                 orderData.metodoPago === 'nequi' ? 'Nequi' :
-                 orderData.metodoPago === 'bancolombia_transfer' ? 'Bancolombia' :
-                 orderData.metodoPago ? orderData.metodoPago.charAt(0).toUpperCase() + orderData.metodoPago.slice(1).replace('_', ' ') : 'No especificado'}
+                {orderData.metodoPago === 'wompi'
+                  ? 'Wompi'
+                  : orderData.metodoPago
+                    ? orderData.metodoPago.charAt(0).toUpperCase() + orderData.metodoPago.slice(1).replace('_', ' ')
+                    : 'No especificado'}
               </ThemedText>
             </View>
 
@@ -333,7 +351,7 @@ export default function OrderConfirmationScreen() {
         {/* Notas */}
         {orderData.notas && (
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Notas</ThemedText>
+            <ThemedText style={styles.sectionTitle}>Notassss</ThemedText>
             <ThemedText style={styles.notesText}>
               {orderData.notas}
             </ThemedText>
@@ -557,6 +575,21 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
     lineHeight: 20,
+  },
+  retryPaymentButton: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  retryPaymentButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   infoMessage: {
     flexDirection: 'row',

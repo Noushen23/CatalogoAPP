@@ -12,7 +12,7 @@ export interface AuthState {
   isAuthenticated: boolean;
 
   login: (email: string, password: string) => Promise<boolean>;
-  register: (nombreCompleto: string, email: string, password: string, telefono?: string, tipo_identificacion?: 'CC' | 'NIT' | 'CE' | 'TR', numero_identificacion?: string) => Promise<boolean>;
+  register: (nombreCompleto: string, nombre: string, segundoNombre: string | undefined, primerApellido: string, segundoApellido: string | undefined, email: string, password: string, telefono?: string, tipo_identificacion?: 'CC' | 'NIT' | 'CE' | 'TR', numero_identificacion?: string) => Promise<boolean>;
   checkStatus: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -73,12 +73,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
   },
 
-  register: async (nombreCompleto: string, email: string, password: string, telefono?: string, tipo_identificacion?: 'CC' | 'NIT' | 'CE' | 'TR', numero_identificacion?: string) => {
+  register: async (nombreCompleto: string, nombre: string, segundoNombre: string | undefined, primerApellido: string, segundoApellido: string | undefined, email: string, password: string, telefono?: string, tipo_identificacion?: 'CC' | 'NIT' | 'CE' | 'TR', numero_identificacion?: string) => {
     try {
       set({ status: 'checking', error: undefined, isAuthenticated: false });
       
       const registerData: RegisterRequest = { 
-        nombreCompleto, 
+        nombreCompleto,
+        nombre,
+        segundoNombre,
+        primerApellido,
+        segundoApellido,
         email, 
         password, 
         telefono,

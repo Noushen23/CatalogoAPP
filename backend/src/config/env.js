@@ -4,6 +4,7 @@ require('dotenv').config();
 console.log('🔍 [Config] Variables de entorno detectadas:', {
   API_BASE_URL: process.env.API_BASE_URL || 'NO CONFIGURADA',
   TERCERO_API_URL: process.env.TERCERO_API_URL || 'NO CONFIGURADA',  
+  APIMATERIAL_URL: process.env.APIMATERIAL_URL || 'NO CONFIGURADA',
   APP_URL: process.env.APP_URL || 'NO CONFIGURADA',
   NODE_ENV: process.env.NODE_ENV || 'NO CONFIGURADA',
   NGROK_URL: process.env.NGROK_URL || 'NO CONFIGURADA',
@@ -143,8 +144,8 @@ const config = {
       
       // En desarrollo, SIEMPRE usar 192.168.3.104 (ignorar variable de entorno si está mal configurada)
       const defaultUrl = isProduction
-        ? 'http://192.168.3.104:51255'
-        : 'http://192.168.3.104:51255';  // IP del servidor en desarrollo
+        ? 'http://192.168.3.104:51252'  
+        : 'http://192.168.3.104:51252';  // IP del servidor en desarrollo
       
       // En desarrollo, SIEMPRE forzar el uso de 192.168.3.104 (ignorar cualquier variable de entorno)
       let finalUrl = defaultUrl;
@@ -166,6 +167,17 @@ const config = {
       return finalUrl;
     })(),
     token: process.env.TERCERO_API_TOKEN || 'angeldavidcapa2025'
+  },
+
+  apimaterial: {
+    url: process.env.APIMATERIAL_URL || 'http://192.168.3.104:51255',
+    token: process.env.APIMATERIAL_TOKEN || 'angeldavidcapa2025',
+    timeout: parseInt(process.env.APIMATERIAL_TIMEOUT, 10) || 10000
+  },
+
+  shipping: {
+    domicilioMatId: process.env.DOMICILIO_MATID || 1553,
+    domicilioCodigo: process.env.DOMICILIO_CODIGO || 'DOMICILIO'
   },
 
 
@@ -195,6 +207,15 @@ const config = {
   checkoutReconciliation: {
     enabled: process.env.CHECKOUT_RECONCILIATION_ENABLED !== 'false',
     cron: process.env.CHECKOUT_RECONCILIATION_CRON || '*/5 * * * *'
+  },
+
+  // Configuración de timeouts de checkout por método de pago (en minutos)
+  checkoutTimeouts: {
+    defaultMinutes: parseInt(process.env.CHECKOUT_TIMEOUT_DEFAULT_MINUTES || '15', 10),
+    tarjetaMinutes: parseInt(process.env.CHECKOUT_TIMEOUT_TARJETA_MINUTES || '15', 10),
+    pseMinutes: parseInt(process.env.CHECKOUT_TIMEOUT_PSE_MINUTES || '15', 10),
+    nequiMinutes: parseInt(process.env.CHECKOUT_TIMEOUT_NEQUI_MINUTES || '15', 10),
+    bancolombiaMinutes: parseInt(process.env.CHECKOUT_TIMEOUT_BANCOLOMBIA_MINUTES || '15', 10)
   }
 };
 

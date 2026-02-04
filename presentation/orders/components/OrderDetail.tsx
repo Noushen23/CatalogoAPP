@@ -8,8 +8,12 @@ import {
   Alert,
   Linking,
   Dimensions,
+  Modal,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/presentation/theme/components/ThemedText';
 import { ThemedView } from '@/presentation/theme/components/ThemedView';
@@ -17,6 +21,7 @@ import { useThemeColor } from '@/presentation/theme/hooks/useThemeColor';
 import { Order } from '@/core/api/ordersApi';
 import { formatDateTime, formatCurrency } from '@/presentation/utils';
 import { getOrderStatusColor, getOrderStatusText, getOrderStatusIcon } from '@/presentation/orders/utils';
+import { useReintentarPago } from '@/presentation/pagos/hooks/usePagos';
 
 const { width } = Dimensions.get('window');
 
@@ -35,8 +40,11 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   const tintColor = useThemeColor({}, 'tint');
   const backgroundColor = useThemeColor({}, 'background');
   const cardBackground = useThemeColor({}, 'cardBackground');
+  const reintentarPagoMutation = useReintentarPago();
   
   const [showFullDescription, setShowFullDescription] = useState<Record<string, boolean>>({});
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Log para depuración - verificar el estado del pedido
   React.useEffect(() => {
@@ -56,24 +64,30 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   };
 
   const handleCancelOrder = () => {
-    Alert.prompt(
-      'Cancelar Pedido',
-      '¿Estás seguro de que quieres cancelar este pedido? (Opcional: explica el motivo)',
-      [
-        { text: 'No', style: 'cancel' },
-        { 
-          text: 'Sí, Cancelar', 
-          style: 'destructive',
-          onPress: (reason: any) => {
-            if (onCancelOrder) {
-              onCancelOrder(order.id, reason || undefined);
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Cancelar Pedido',
+        '¿Estás seguro de que quieres cancelar este pedido? (Opcional: explica el motivo)',
+        [
+          { text: 'No', style: 'cancel' },
+          { 
+            text: 'Sí, Cancelar', 
+            style: 'destructive',
+            onPress: (reason: any) => {
+              if (onCancelOrder) {
+                onCancelOrder(order.id, reason || undefined);
+              }
             }
           }
-        }
-      ],
-      'plain-text',
-      ''
-    );
+        ],
+        'plain-text',
+        ''
+      );
+      return;
+    }
+
+    setCancelReason('');
+    setShowCancelModal(true);
   };
 
   // Solo se puede cancelar si el pedido está en estado 'pendiente' y no está pagado
@@ -83,6 +97,17 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
   const statusColor = getOrderStatusColor(order.estado);
   const statusText = getOrderStatusText(order.estado);
   const statusIcon = getOrderStatusIcon(order.estado);
+  const estadoNormalizado = (order.estado || '').toString().trim().toLowerCase();
+  const showRetryPayment = [
+    'cancelada',
+    'cancelado',
+    'canceled',
+    'cancelled',
+    'pago_fallido',
+    'fallido',
+    'error',
+    'failed',
+  ].includes(estadoNormalizado);
 
   // Calcular estadísticas del pedido
   const orderStats = useMemo(() => {
@@ -150,6 +175,40 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
     }));
   }, [order.estado]);
 
+  const handleRetryPayment = async () => {
+    try {
+      const transaccionResult = await reintentarPagoMutation.mutateAsync({
+        pedidoId: order.id,
+      });
+
+      if (transaccionResult?.urlCheckout) {
+        try {
+          await SecureStore.setItemAsync('wompi_checkout_url', transaccionResult.urlCheckout);
+          if (transaccionResult.referencia) {
+            await SecureStore.setItemAsync('wompi_checkout_ref', transaccionResult.referencia);
+          }
+        } catch (storeError) {
+          console.warn('⚠️ [Pago] No se pudo guardar URL en SecureStore:', storeError);
+        }
+
+        router.push({
+          pathname: '/(customer)/wompi-checkout',
+          params: {
+            transaccionId: transaccionResult.transaccionId,
+            urlCheckout: transaccionResult.urlCheckout,
+            referencia: transaccionResult.referencia,
+            pedidoId: transaccionResult.pedidoId,
+          },
+        });
+      } else {
+        throw new Error('No se recibió URL de checkout de Wompi');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'No se pudo reintentar el pago';
+      Alert.alert('Error al Reintentar Pago', errorMessage, [{ text: 'Entendido' }]);
+    }
+  };
+
   return (
     <ScrollView 
       style={styles.container} 
@@ -187,6 +246,19 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
               {order.estado === 'reembolsada' && 'Reembolso procesado'}
             </ThemedText>
           </View>
+          {showRetryPayment && (
+            <TouchableOpacity
+              style={[styles.retryPaymentButton, { backgroundColor: tintColor }]}
+              onPress={handleRetryPayment}
+              disabled={reintentarPagoMutation.isPending}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={16} color="white" />
+              <ThemedText style={styles.retryPaymentButtonText}>
+                Reintentar pago
+              </ThemedText>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Estadísticas rápidas */}
@@ -372,10 +444,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
         <View style={styles.paymentInfo}>
           <Ionicons name="card-outline" size={16} color="#666" />
           <ThemedText style={styles.paymentText}>
-            {order.metodoPago === 'efectivo' ? 'Efectivo' : 
-             order.metodoPago === 'tarjeta' ? 'Tarjeta' :
-             order.metodoPago === 'transferencia' ? 'Transferencia' :
-             order.metodoPago === 'pse' ? 'PSE' : order.metodoPago}
+            {order.metodoPago === 'wompi' ? 'Wompi' : 'Wompi'}
           </ThemedText>
         </View>
         {order.referenciaPago && (
@@ -389,7 +458,7 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
       {/* Notas */}
       {order.notas && (
         <ThemedView style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Notas</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Notassssss</ThemedText>
           <ThemedText style={styles.notesText}>{order.notas}</ThemedText>
         </ThemedView>
       )}
@@ -490,6 +559,48 @@ export const OrderDetail: React.FC<OrderDetailProps> = ({
           <ThemedText style={styles.cancelButtonText}>Cancelar Pedido</ThemedText>
         </TouchableOpacity>
       )}
+      <Modal
+        visible={showCancelModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCancelModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: cardBackground }]}>
+            <ThemedText style={styles.modalTitle}>Cancelar Pedido</ThemedText>
+            <ThemedText style={styles.modalSubtitle}>
+              ¿Estás seguro de que quieres cancelar este pedido? (Opcional: explica el motivo)
+            </ThemedText>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Motivo (opcional)"
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowCancelModal(false)}
+              >
+                <ThemedText style={styles.modalCancelText}>No</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, { backgroundColor: '#F44336' }]}
+                onPress={() => {
+                  setShowCancelModal(false);
+                  if (onCancelOrder) {
+                    const reason = cancelReason.trim();
+                    onCancelOrder(order.id, reason || undefined);
+                  }
+                }}
+              >
+                <ThemedText style={styles.modalConfirmText}>Sí, Cancelar</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -601,6 +712,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontStyle: 'italic',
     opacity: 0.8,
+  },
+  retryPaymentButton: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    gap: 8,
+  },
+  retryPaymentButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   section: {
     padding: 18,
@@ -846,6 +973,64 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     marginLeft: 8,
     letterSpacing: 0.5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#1a1a1a',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 70,
+    backgroundColor: '#fff',
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 16,
+  },
+  modalCancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: '#f0f0f0',
+  },
+  modalCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
+  modalConfirmButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  modalConfirmText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
   timelineContainer: {
     marginTop: 12,

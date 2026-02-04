@@ -4,6 +4,7 @@
  */
 
 const { executeQuery, executeTransactionWithCallback, createConnection } = require('../config/database');
+const config = require('../config/app.config');
 
 // Cliente para la base de datos móvil (donde están las tablas ordenes e items_orden)
 const mysql = require('mysql2/promise');
@@ -23,8 +24,8 @@ function round2(value) {
 const mobileDbConfig = {
     host: process.env.MOBILE_DB_HOST || process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.MOBILE_DB_PORT || process.env.DB_PORT || '3306', 10),
-    user: process.env.MOBILE_DB_USER || process.env.DB_USER || 'desarrollador',
-    password: process.env.MOBILE_DB_PASSWORD || process.env.DB_PASSWORD || 'Bomberos2025#',
+    user: process.env.MOBILE_DB_USER || process.env.DB_USER || 'root',
+    password: process.env.MOBILE_DB_PASSWORD || process.env.DB_PASSWORD || '',
     database: process.env.MOBILE_DB_NAME || process.env.DB_NAME || 'tiendamovil',
     charset: 'utf8mb4',
     timezone: 'Z',
@@ -139,6 +140,59 @@ async function migrateOrderToTNS(ordenId, options = {}) {
         throw new Error(`No se encontraron items para la orden ${ordenId}`);
     }
 
+    // Agregar DOMICILIO como línea de pedido si hay costo de envío
+    const costoEnvio = Number(orden.costo_envio || 0);
+    if (costoEnvio > 0) {
+        const domicilioMatId = config.shipping?.domicilioMatId;
+        const domicilioCodigo = config.shipping?.domicilioCodigo || 'DOMICILIO';
+        let domicilioMaterial = null;
+
+        if (domicilioMatId) {
+            const rows = await executeQuery(
+                `SELECT FIRST 1 MATID, CODIGO, DESCRIP
+                 FROM MATERIAL
+                 WHERE MATID = ?`,
+                [domicilioMatId]
+            );
+            domicilioMaterial = rows && rows[0];
+        } else {
+            const rows = await executeQuery(
+                `SELECT FIRST 1 MATID, CODIGO, DESCRIP
+                 FROM MATERIAL
+                 WHERE UPPER(CODIGO) = UPPER(?)`,
+                [domicilioCodigo]
+            );
+            domicilioMaterial = rows && rows[0];
+        }
+
+        if (!domicilioMaterial || !domicilioMaterial.MATID) {
+            throw new Error(`Material DOMICILIO no encontrado en TNS (MATID: ${domicilioMatId || 'N/A'}, CODIGO: ${domicilioCodigo})`);
+        }
+
+        items.push({
+            id: null, // No existe en items_orden
+            orden_id: ordenId,
+            producto_id: null,
+            cantidad: 1,
+            precio_unitario: costoEnvio,
+            subtotal: costoEnvio,
+            tns_dekardex_id: null,
+            tns_matid: domicilioMaterial.MATID,
+            tns_codigo_material: domicilioMaterial.CODIGO || domicilioCodigo,
+            tns_nombre_material: domicilioMaterial.DESCRIP || domicilioCodigo,
+            tns_precio_tns: costoEnvio,
+            tns_sincronizado: 'pendiente',
+            producto_matid: domicilioMaterial.MATID,
+            producto_nombre: domicilioMaterial.DESCRIP || 'DOMICILIO',
+            producto_sku: domicilioMaterial.CODIGO || domicilioCodigo
+        });
+        console.log('🚚 DOMICILIO agregado a migración:', {
+            matid: domicilioMaterial.MATID,
+            codigo: domicilioMaterial.CODIGO,
+            precio: costoEnvio
+        });
+    }
+
     console.log(`📦 Migrando ${items.length} items de la orden ${ordenId}`);
     console.log(`📊 Datos de la orden móvil:`, {
         numero_orden: orden.numero_orden,
@@ -200,7 +254,7 @@ async function migrateOrderToTNS(ordenId, options = {}) {
     }
 
     // Usar vendedor específico por TERID
-    const vendedorId = 1007816;
+    const vendedorId = 5;
     
     // Verificar que el vendedor existe y es activo
     const vendedorQuery = `
@@ -783,6 +837,9 @@ async function migrateOrderToTNS(ordenId, options = {}) {
     for (let i = 0; i < itemsValidados.length; i++) {
         const item = itemsValidados[i];
         const dekardexId = resultado.dekardexIds[i];
+        if (!item.id) {
+            continue; // DOMICILIO u otros ítems que no existen en items_orden
+        }
 
         const updateItemQuery = `
             UPDATE items_orden SET 

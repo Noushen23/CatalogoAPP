@@ -15,8 +15,8 @@ const validateCreateOrder = [
     .withMessage('ID de dirección de envío inválido'),
   body('metodoPago')
     .optional()
-    .isIn(['tarjeta', 'pse', 'nequi', 'bancolombia_transfer'])
-    .withMessage('Método de pago inválido. Solo se permiten métodos de pago de Wompi'),
+    .isIn(['wompi'])
+    .withMessage('Método de pago inválido. Solo se permite Wompi'),
   body('referenciaPago')
     .optional()
     .isLength({ max: 100 })
@@ -53,6 +53,10 @@ const validateUpdateStatus = [
   body('estado')
     .isIn(['pendiente', 'confirmada', 'en_proceso', 'enviada', 'entregada', 'cancelada', 'reembolsada'])
     .withMessage('Estado de pedido inválido'),
+  body('forceSyncTercero')
+    .optional()
+    .isBoolean()
+    .withMessage('forceSyncTercero debe ser booleano'),
   body('notas')
     .optional()
     .isLength({ max: 500 })
@@ -67,8 +71,8 @@ const validateCreateOrderFromCart = [
     .withMessage('ID de dirección de envío inválido'),
   body('metodoPago')
     .optional()
-    .isIn(['tarjeta', 'pse', 'nequi', 'bancolombia_transfer'])
-    .withMessage('Método de pago inválido. Solo se permiten métodos de pago de Wompi'),
+    .isIn(['wompi'])
+    .withMessage('Método de pago inválido. Solo se permite Wompi'),
   body('referenciaPago')
     .optional()
     .isLength({ max: 100 })

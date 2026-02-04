@@ -16,6 +16,11 @@ const SERVER_CONFIG = {
     HOST: '192.168.3.104',
     PORT: 51255,
   },
+  // ApiPedidoVenta (Migración de pedidos)
+  MIGRATION: {
+    HOST: '192.168.3.104',
+    PORT: 51250,
+  },
   // IP pública (producción)
   PUBLIC: {
     HOST: '192.168.3.104',
@@ -57,7 +62,9 @@ export const CONFIG = {
   // URL: http://192.168.3.6:51250/api
   MIGRATION: {
     // Forzar URL correcta - ApiPedidoVenta en puerto 51250
-    BASE_URL: process.env.NEXT_PUBLIC_MIGRATION_API_URL || `http://${SERVER_CONFIG.TNS.HOST}:${SERVER_CONFIG.TNS.PORT}/api`,
+    BASE_URL:
+      process.env.NEXT_PUBLIC_MIGRATION_API_URL ||
+      `http://${SERVER_CONFIG.MIGRATION.HOST}:${SERVER_CONFIG.MIGRATION.PORT}/api`,
     TIMEOUT: 30000,
   },
 
@@ -183,7 +190,7 @@ export const getMigrationApiUrl = (): string => {
   if (url.includes(':3001')) {
     console.warn('⚠️ ADVERTENCIA: URL de migración apunta al puerto 3001 (incorrecto). Debe ser 51250')
     // Forzar URL correcta
-    return `http://${SERVER_CONFIG.TNS.HOST}:${SERVER_CONFIG.TNS.PORT}/api`
+    return `http://${SERVER_CONFIG.MIGRATION.HOST}:${SERVER_CONFIG.MIGRATION.PORT}/api`
   }
   
   // Log en desarrollo para verificar URL

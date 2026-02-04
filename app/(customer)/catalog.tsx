@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { useProducts, useProductSearch } from '@/presentation/products/hooks/useProducts';
 import { ThemedView } from '@/presentation/theme/components/ThemedView';
@@ -55,6 +55,25 @@ const getResponsiveDimensions = () => {
   };
 };
 
+const PendingPaymentNotice = () => {
+  const params = useLocalSearchParams<{ pendingPayment?: string; pedidoId?: string }>();
+  const shownRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (shownRef.current) return;
+    if (params?.pendingPayment === '1') {
+      shownRef.current = true;
+      Alert.alert(
+        'Pago pendiente',
+        'Tienes un pedido pendiente por pagar. Puedes retomarlo desde Mis pedidos.',
+        [{ text: 'Entendido' }]
+      );
+    }
+  }, [params?.pendingPayment]);
+
+  return null;
+};
+
 // Visual Product Card con estilos mejorados
 const ProductItem = memo(({ product }: { product: Product }) => {
   const tintColor = useThemeColor({}, 'tint');
@@ -79,6 +98,7 @@ const ProductItem = memo(({ product }: { product: Product }) => {
         productId: product.id,
         quantity: 1
       });
+
       Alert.alert(
         '✅ Agregado al carrito',
         `${product.nombre} agregado exitosamente`,
@@ -546,6 +566,7 @@ export default function CatalogScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <PendingPaymentNotice />
       {/* Header Search/Carrito */}
       <View style={[
         styles.headerContainer,

@@ -46,6 +46,39 @@ export const useCrearTransaccion = () => {
 };
 
 /**
+ * Hook para reintentar el pago de un pedido
+ */
+export const useReintentarPago = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { pedidoId: string; data?: CrearTransaccionRequest }) => {
+      const { pedidoId, data = {} } = payload;
+      console.log('🔁 [Pago] Reintentando pago para pedido:', pedidoId);
+
+      const response = await pagosApi.reintentarPago(pedidoId, data);
+
+      if (!response.success) {
+        const error = new Error(response.message || 'Error al reintentar el pago');
+        error.name = 'PagoRetryError';
+        throw error;
+      }
+
+      return response.data;
+    },
+    onSuccess: (transaccion) => {
+      console.log('✅ [Pago] Reintento iniciado:', transaccion);
+
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'user'] });
+    },
+    onError: (error) => {
+      console.error('❌ [Pago] Error al reintentar pago:', error);
+    }
+  });
+};
+
+/**
  * Hook para consultar el estado de una transacción
  */
 export const useConsultarTransaccion = (idTransaccion: string | null) => {
@@ -79,5 +112,29 @@ export const useConfiguracionWompi = () => {
       return response.data;
     },
     staleTime: 1000 * 60 * 60, // Cache por 1 hora
+  });
+};
+
+/**
+ * Hook para obtener tiempo restante de checkout
+ */
+export const useCheckoutStatus = (pedidoId: string | null, enabled = true) => {
+  return useQuery({
+    queryKey: [...PAGOS_QUERY_KEY, 'tiempo-restante', pedidoId],
+    queryFn: async () => {
+      if (!pedidoId) {
+        throw new Error('ID de pedido es requerido');
+      }
+
+      const response = await pagosApi.verificarTiempoRestante(pedidoId);
+
+      if (!response.success) {
+        throw new Error(response.message || 'Error al obtener tiempo restante');
+      }
+
+      return response.data;
+    },
+    enabled: !!pedidoId && enabled,
+    refetchInterval: enabled ? 30000 : false
   });
 };

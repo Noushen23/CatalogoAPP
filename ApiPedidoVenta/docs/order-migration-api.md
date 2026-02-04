@@ -1,7 +1,7 @@
 # API de Migración de Órdenes a TNS
 
 ## Descripción
-API para migrar órdenes desde las tablas `ordenes` e `items_orden` al sistema TNS, incluyendo los procesos de `orderDetail` e `iniciarPreparacion`.
+API para migrar órdenes desde las tablas `ordenes` e `items_orden` al sistema TNS, incluyendo el proceso de `orderDetail`.
 
 ## Base URL
 ```
@@ -66,52 +66,7 @@ Obtiene los detalles de una orden y su estado de migración a TNS.
 }
 ```
 
-### 2. Iniciar Preparación (Migrar e Iniciar)
-**POST** `/api/orders/:id/iniciar-preparacion`
-
-Migra la orden a TNS e inicia automáticamente la preparación.
-
-#### Payload
-```json
-{
-  "usuario": "MOBILE_USER",
-  "codprefijo": "PA",
-  "codcomp": "PV",
-  "sucid": 1,
-  "iniciarPreparacion": true
-}
-```
-
-#### Parámetros
-| Campo | Tipo | Requerido | Descripción |
-|-------|------|-----------|-------------|
-| `usuario` | string | ❌ | Usuario que procesa (default: "MOBILE_USER") |
-| `codprefijo` | string | ❌ | Prefijo TNS (default: "PA") |
-| `codcomp` | string | ❌ | Compañía TNS (default: "PV") |
-| `sucid` | number | ❌ | ID sucursal (default: 1) |
-| `iniciarPreparacion` | boolean | ❌ | Iniciar preparación (default: true) |
-
-#### Respuesta Exitosa
-```json
-{
-  "success": true,
-  "message": "Orden migrada exitosamente a TNS",
-  "data": {
-    "ordenId": "uuid-123",
-    "tnsKardexId": 170671,
-    "tnsNumero": "00000034",
-    "terceroId": 1453,
-    "vendedorId": 17,
-    "total": 25000.00,
-    "itemsCount": 1,
-    "dekardexIds": [12345],
-    "iniciarPreparacion": true,
-    "estado": "PREPARACION_INICIADA"
-  }
-}
-```
-
-### 3. Solo Migrar Orden
+### 2. Solo Migrar Orden
 **POST** `/api/orders/:id/migrate`
 
 Migra la orden a TNS sin iniciar preparación.
@@ -145,7 +100,7 @@ Migra la orden a TNS sin iniciar preparación.
 }
 ```
 
-### 4. Estado de Migración
+### 3. Estado de Migración
 **GET** `/api/orders/migration-status`
 
 Obtiene el estado de migración de múltiples órdenes.
@@ -186,7 +141,7 @@ Obtiene el estado de migración de múltiples órdenes.
 }
 ```
 
-### 5. Reintentar Migración
+### 4. Reintentar Migración
 **PUT** `/api/orders/:id/retry-migration`
 
 Reintenta la migración de una orden que tuvo errores.
@@ -263,7 +218,6 @@ Reintenta la migración de una orden que tuvo errores.
 
 ### Estados de Orden
 - **`MIGRADO_PENDIENTE`**: Migrado sin iniciar preparación
-- **`PREPARACION_INICIADA`**: Migrado e iniciada preparación
 - **`MIGRADO_EXITOSO`**: Migración completada
 
 ## Ejemplos de Uso
@@ -271,16 +225,6 @@ Reintenta la migración de una orden que tuvo errores.
 ### Obtener Detalles de Orden
 ```bash
 curl "http://localhost:51250/api/orders/uuid-123/detail"
-```
-
-### Iniciar Preparación
-```bash
-curl -X POST "http://localhost:51250/api/orders/uuid-123/iniciar-preparacion" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "usuario": "MOBILE_USER",
-    "iniciarPreparacion": true
-  }'
 ```
 
 ### Solo Migrar

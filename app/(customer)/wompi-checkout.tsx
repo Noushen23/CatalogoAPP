@@ -1,231 +1,402 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
+import * as Linking from 'expo-linking';
 import { WebView } from 'react-native-webview';
-import type { WebViewNavigation } from 'react-native-webview';
-import { useQueryClient } from '@tanstack/react-query';
 
 import { ThemedView } from '@/presentation/theme/components/ThemedView';
 import { ThemedText } from '@/presentation/theme/components/ThemedText';
+import { FullScreenLoader } from '@/presentation/theme/components/FullScreenLoader';
+import { ErrorDisplay } from '@/presentation/theme/components/ErrorDisplay';
 import { useThemeColor } from '@/presentation/theme/hooks/useThemeColor';
-import { ordersApi } from '@/core/api/ordersApi';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+
+const WOMPI_DEEP_LINK_PREFIX = 'tienda-bomberos://';
+
+const pickFirstParam = (value?: string | string[]) =>
+  Array.isArray(value) ? value[0] : value;
+
+const getPedidoIdFromUrl = (url: string) => {
+  const parsed = Linking.parse(url);
+  const pedido = parsed?.queryParams?.pedido;
+  return typeof pedido === 'string' ? pedido : undefined;
+};
 
 export default function WompiCheckoutScreen() {
   const params = useLocalSearchParams<{
-    urlCheckout?: string | string[];
     transaccionId?: string | string[];
+    urlCheckout?: string | string[];
     referencia?: string | string[];
+    pedidoId?: string | string[];
   }>();
 
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isConfirming, setIsConfirming] = useState(false);
-  const [showWebView, setShowWebView] = useState(true);
-  const [referenciaState, setReferenciaState] = useState<string | null>(null);
-
-  const hasOpenedRef = useRef(false);
-  const hasCompletedRef = useRef(false);
   const tintColor = useThemeColor({}, 'tint');
-  const queryClient = useQueryClient();
+  const backgroundColor = useThemeColor({}, 'background');
+  const borderColor = '#e0e0e0';
+  const navigation = useNavigation();
 
-  const urlFromParams = useMemo(() => {
-    if (!params.urlCheckout) return null;
-    return Array.isArray(params.urlCheckout) ? params.urlCheckout[0] : params.urlCheckout;
-  }, [params.urlCheckout]);
+  const webViewRef = useRef<WebView>(null);
+  const redirectHandledRef = useRef(false);
 
-  const transaccionId = useMemo(() => {
-    if (!params.transaccionId) return null;
-    return Array.isArray(params.transaccionId) ? params.transaccionId[0] : params.transaccionId;
-  }, [params.transaccionId]);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [referencia, setReferencia] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [isHandlingRedirect, setIsHandlingRedirect] = useState(false);
+  const [webViewKey, setWebViewKey] = useState(0);
 
-  const referencia = useMemo(() => {
-    if (!params.referencia) return null;
-    return Array.isArray(params.referencia) ? params.referencia[0] : params.referencia;
-  }, [params.referencia]);
+  const transaccionId = useMemo(
+    () => pickFirstParam(params.transaccionId),
+    [params.transaccionId]
+  );
+
+  const pedidoId = useMemo(
+    () => pickFirstParam(params.pedidoId),
+    [params.pedidoId]
+  );
+
+  const loadCheckoutData = useCallback(async () => {
+    setIsRestoring(true);
+    try {
+      const urlParam = pickFirstParam(params.urlCheckout);
+      const refParam = pickFirstParam(params.referencia);
+      const storedUrl = await SecureStore.getItemAsync('wompi_checkout_url');
+      const storedRef = await SecureStore.getItemAsync('wompi_checkout_ref');
+
+      setCheckoutUrl(urlParam || storedUrl || null);
+      setReferencia(refParam || storedRef || null);
+    } finally {
+      setIsRestoring(false);
+    }
+  }, [params.urlCheckout, params.referencia]);
 
   useEffect(() => {
-    let isActive = true;
+    loadCheckoutData();
+  }, [loadCheckoutData]);
 
-    const loadCheckoutUrl = async () => {
-      let finalUrl = urlFromParams || null;
-      let finalReferencia = referencia || null;
-
-      if (!finalUrl) {
-        finalUrl = await SecureStore.getItemAsync('wompi_checkout_url');
-      }
-      if (!finalReferencia) {
-        finalReferencia = await SecureStore.getItemAsync('wompi_checkout_ref');
-      }
-
-      if (!isActive) return;
-
-      if (!finalUrl) {
-        setErrorMessage('No se encontró la URL de Wompi. Vuelve a intentar desde el checkout.');
-        return;
-      }
-
-      setCheckoutUrl(finalUrl);
-      setReferenciaState(finalReferencia);
-      setErrorMessage(null);
-
-      if (!hasOpenedRef.current) {
-        hasOpenedRef.current = true;
-        setIsLoading(true);
-      }
-    };
-
-    void loadCheckoutUrl();
-
-    return () => {
-      isActive = false;
-    };
-  }, [urlFromParams]);
-
-  const handleNavigation = useCallback((navState: WebViewNavigation) => {
-    const url = navState.url || '';
-
-    // Evitar falsos positivos: la URL inicial de Wompi trae redirect-url en query
-    if (
-      !url ||
-      url.startsWith('about:') ||
-      url.includes('checkout.wompi.co')
-    ) {
-      return;
-    }
-
-    let pathname = '';
+  const clearCheckoutStorage = useCallback(async () => {
     try {
-      pathname = new URL(url).pathname || '';
-    } catch {
-      return;
-    }
-
-    if (hasCompletedRef.current) {
-      return;
-    }
-
-    if (pathname.endsWith('/pago-exitoso')) {
-      hasCompletedRef.current = true;
-      setShowWebView(false);
-      setIsConfirming(true);
-    }
-    if (pathname.endsWith('/pago-error')) {
-      hasCompletedRef.current = true;
-      setErrorMessage('El pago no se completó. Intenta nuevamente.');
-      setShowWebView(false);
+      await SecureStore.deleteItemAsync('wompi_checkout_url');
+      await SecureStore.deleteItemAsync('wompi_checkout_ref');
+    } catch (error) {
+      console.warn('⚠️ [Wompi] No se pudo limpiar SecureStore:', error);
     }
   }, []);
 
+  const handleExitToCatalog = useCallback(async () => {
+    await clearCheckoutStorage();
+    router.replace({
+      pathname: '/(customer)/catalog',
+      params: {
+        pendingPayment: '1',
+        pedidoId: pedidoId || undefined,
+      },
+    });
+  }, [clearCheckoutStorage, pedidoId]);
+
+  const handleExit = useCallback(() => {
+    if (redirectHandledRef.current || isHandlingRedirect) {
+      return;
+    }
+
+    Alert.alert(
+      '¿Volver al catálogo?',
+      'Tu pedido seguirá pendiente de pago. Puedes retomarlo desde Mis pedidos.',
+      [
+        { text: 'Continuar pago', style: 'cancel' },
+        {
+          text: 'Volver a catálogo',
+          style: 'destructive',
+          onPress: handleExitToCatalog,
+        },
+      ]
+    );
+  }, [isHandlingRedirect, handleExitToCatalog]);
+
+  const handlePagoExitoso = useCallback(
+    async (url: string) => {
+      if (redirectHandledRef.current) return;
+      redirectHandledRef.current = true;
+      setIsHandlingRedirect(true);
+      await clearCheckoutStorage();
+
+      const pedidoId = getPedidoIdFromUrl(url);
+      if (pedidoId) {
+        router.replace({
+          pathname: '/(customer)/order-confirmation/[id]',
+          params: { id: pedidoId },
+        });
+        return;
+      }
+
+      Alert.alert(
+        'Pago recibido',
+        'Estamos confirmando tu compra. Puedes revisar el estado en tus pedidos.',
+        [
+          {
+            text: 'Ver pedidos',
+            onPress: () => router.replace('/(customer)/orders' as any),
+          },
+          {
+            text: 'Volver al catálogo',
+            onPress: () => router.replace('/(customer)/catalog'),
+          },
+        ]
+      );
+    },
+    [clearCheckoutStorage]
+  );
+
+  const handlePagoError = useCallback(
+    async (url: string) => {
+      if (redirectHandledRef.current) return;
+      redirectHandledRef.current = true;
+      setIsHandlingRedirect(true);
+      await clearCheckoutStorage();
+
+      const pedidoId = getPedidoIdFromUrl(url);
+      Alert.alert(
+        'Pago no completado',
+        'No fue posible procesar el pago. Puedes intentarlo nuevamente.',
+        [
+          {
+            text: 'Reintentar',
+            onPress: () => router.replace('/(customer)/checkout' as any),
+          },
+          {
+            text: pedidoId ? 'Ver pedido' : 'Ver pedidos',
+            onPress: () => {
+              if (pedidoId) {
+                router.replace({
+                  pathname: '/(customer)/order-confirmation/[id]',
+                  params: { id: pedidoId },
+                });
+              } else {
+                router.replace('/(customer)/orders' as any);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [clearCheckoutStorage]
+  );
+
+  const handleDeepLink = useCallback(
+    (url: string) => {
+      if (url.startsWith(`${WOMPI_DEEP_LINK_PREFIX}pago-exitoso`)) {
+        handlePagoExitoso(url);
+        return true;
+      }
+
+      if (url.startsWith(`${WOMPI_DEEP_LINK_PREFIX}pago-error`)) {
+        handlePagoError(url);
+        return true;
+      }
+
+      return false;
+    },
+    [handlePagoExitoso, handlePagoError]
+  );
+
+  const handleShouldStartLoad = useCallback(
+    (request: { url: string }) => {
+      const { url } = request;
+      if (url.startsWith(WOMPI_DEEP_LINK_PREFIX)) {
+        handleDeepLink(url);
+        return false;
+      }
+      return true;
+    },
+    [handleDeepLink]
+  );
+
   useEffect(() => {
-    const referenciaPago = referencia || referenciaState;
-    if (!referenciaPago || !isConfirming) return;
-
-    let cancelled = false;
-    let attempts = 0;
-    const maxAttempts = 30;
-
-    const intervalId = setInterval(async () => {
-      if (cancelled) return;
-      attempts += 1;
-
-      try {
-        const response = await ordersApi.getUserOrderByReference(referenciaPago);
-        if (response.success && response.data?.id) {
-          await queryClient.invalidateQueries({ queryKey: ['cart'] });
-          await queryClient.invalidateQueries({ queryKey: ['cart', 'summary'] });
-          setIsConfirming(false);
-          router.replace(`/(customer)/orders/${response.data.id}`);
-          clearInterval(intervalId);
-        }
-      } catch (error: any) {
-        const status = error?.response?.status;
-        if (status && status !== 404) {
-          setErrorMessage('No se pudo confirmar el pedido. Intenta nuevamente.');
-          setIsConfirming(false);
-          clearInterval(intervalId);
-        }
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (redirectHandledRef.current || isHandlingRedirect) {
+        return;
       }
 
-      if (attempts >= maxAttempts) {
-        setIsConfirming(false);
-        setErrorMessage('Estamos confirmando tu pago. Revisa tus pedidos en unos minutos.');
-        clearInterval(intervalId);
-      }
-    }, 4000);
+      e.preventDefault();
 
-    return () => {
-      cancelled = true;
-      clearInterval(intervalId);
-    };
-  }, [referencia, referenciaState, isConfirming, queryClient]);
+      Alert.alert(
+        '¿Volver al catálogo?',
+        'Tu pedido seguirá pendiente de pago. Puedes retomarlo desde Mis pedidos.',
+        [
+          { text: 'Continuar pago', style: 'cancel' },
+          {
+            text: 'Volver a catálogo',
+            style: 'destructive',
+            onPress: handleExitToCatalog,
+          }
+        ]
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation, isHandlingRedirect, handleExitToCatalog]);
+
+  useEffect(() => {
+    const parentNavigation = navigation.getParent();
+    if (!parentNavigation) return;
+
+    const unsubscribe = (parentNavigation as any).addListener('tabPress', (e: any) => {
+      if (redirectHandledRef.current || isHandlingRedirect) {
+        return;
+      }
+
+      e.preventDefault?.();
+
+      const parentState = parentNavigation.getState();
+      const targetRoute = parentState?.routes?.find(route => route.key === e.target);
+
+      Alert.alert(
+        '¿Volver al catálogo?',
+        'Tu pedido seguirá pendiente de pago. Puedes retomarlo desde Mis pedidos.',
+        [
+          { text: 'Continuar pago', style: 'cancel' },
+          {
+            text: 'Volver a catálogo',
+            style: 'destructive',
+            onPress: handleExitToCatalog,
+          }
+        ]
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation, isHandlingRedirect, handleExitToCatalog]);
+
+  if (isRestoring) {
+    return <FullScreenLoader message="Preparando pago..." />;
+  }
+
+  if (!checkoutUrl) {
+    return (
+      <ErrorDisplay
+        title="No pudimos abrir el pago"
+        message="No se encontró la URL del checkout. Intenta nuevamente desde el carrito."
+        onRetry={async () => {
+          await loadCheckoutData();
+          setWebViewKey(prev => prev + 1);
+        }}
+        retryText="Reintentar"
+      />
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={22} color="#333" />
+       <SafeAreaView edges={['top']} style={{ backgroundColor }}>
+    <View
+      style={[
+        styles.header,
+        { backgroundColor, borderBottomColor: borderColor || '#eee' },
+      ]}
+    >
+        <TouchableOpacity
+          onPress={() => {
+            if (canGoBack) {
+              webViewRef.current?.goBack();
+              return;
+            }
+            handleExit();
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name={canGoBack ? 'arrow-back' : 'close'} size={24} color="#333" />
         </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>Pago con Wompi</ThemedText>
-        <View style={styles.headerRight} />
+
+        <ThemedText style={styles.headerTitle}>Pago seguro</ThemedText>
+
+        <TouchableOpacity onPress={handleExit} activeOpacity={0.7}>
+          <Ionicons name="close" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+        </SafeAreaView>
+
+      <View style={styles.notice}>
+        <Ionicons name="lock-closed-outline" size={18} color={tintColor} />
+        <ThemedText style={styles.noticeText}>
+          Procesando pago con Wompi. No cierres esta pantalla hasta terminar.
+        </ThemedText>
       </View>
 
-      <View style={styles.content}>
-        {errorMessage && (
-          <View style={styles.errorCard}>
-            <Ionicons name="warning-outline" size={20} color="#D32F2F" />
-            <ThemedText style={styles.errorText}>{errorMessage}</ThemedText>
-          </View>
-        )}
-
-        <View style={styles.webviewContainer}>
-          {showWebView ? (
-            checkoutUrl ? (
-              <WebView
-                source={{ uri: checkoutUrl }}
-                onLoadStart={() => setIsLoading(true)}
-                onLoadEnd={() => setIsLoading(false)}
-                onNavigationStateChange={handleNavigation}
-                startInLoadingState
-                renderLoading={() => (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={tintColor} />
-                    <ThemedText style={styles.loadingText}>Cargando Wompi...</ThemedText>
-                  </View>
-                )}
-                cacheEnabled={false}
-                javaScriptEnabled
-                domStorageEnabled
-                originWhitelist={['https://*', 'http://*']}
-              />
-            ) : (
-              <View style={styles.loadingContainer}>
-                <ThemedText style={styles.loadingText}>
-                  No se encontró la URL de Wompi.
-                </ThemedText>
-              </View>
-            )
-          ) : (
+      <View style={styles.webviewContainer}>
+        <WebView
+          ref={webViewRef}
+          key={webViewKey}
+          source={{ uri: checkoutUrl }}
+          onNavigationStateChange={(navState) => {
+            setCanGoBack(navState.canGoBack);
+            if (navState.url?.startsWith(WOMPI_DEEP_LINK_PREFIX)) {
+              handleDeepLink(navState.url);
+            }
+          }}
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
+          startInLoadingState
+          renderLoading={() => (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={tintColor} />
+              <ThemedText style={styles.loadingText}>Cargando checkout...</ThemedText>
+            </View>
+          )}
+          renderError={() => (
+            <View style={styles.loadingContainer}>
+              <Ionicons name="alert-circle-outline" size={40} color="#F44336" />
               <ThemedText style={styles.loadingText}>
-                Estamos confirmando tu pago...
+                Ocurrió un problema cargando el checkout.
               </ThemedText>
             </View>
           )}
-          {(isLoading && showWebView) || isConfirming ? (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color={tintColor} />
-              {isConfirming ? (
-                <ThemedText style={styles.loadingText}>Confirmando pago...</ThemedText>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-
+          javaScriptEnabled
+          domStorageEnabled
+          onError={() => {
+            Alert.alert(
+              'Error en el pago',
+              'No se pudo cargar el checkout. Intenta nuevamente.',
+              [
+                {
+                  text: 'Reintentar',
+                  onPress: () => setWebViewKey(prev => prev + 1),
+                },
+                {
+                  text: 'Salir',
+                  onPress: handleExit,
+                  style: 'destructive',
+                },
+              ]
+            );
+          }}
+        />
       </View>
+
+      {isHandlingRedirect && (
+        <View style={styles.redirectOverlay}>
+          <ActivityIndicator size="large" color={tintColor} />
+          <ThemedText style={styles.redirectText}>
+            Confirmando pago...
+          </ThemedText>
+        </View>
+      )}
+
+      {!!transaccionId && (
+        <View style={styles.footer}>
+          <ThemedText style={styles.footerText}>
+            Referencia: {referencia || transaccionId}
+          </ThemedText>
+        </View>
+      )}
     </ThemedView>
   );
 }
@@ -233,69 +404,72 @@ export default function WompiCheckoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 5,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    justifyContent: 'center',
+    gap: 12,
+
+
+
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-  },
-  headerRight: {
-    minWidth: 22,
-  },
-  content: {
     flex: 1,
-    padding: 20,
-    gap: 16,
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 8,
+
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#555',
   },
   webviewContainer: {
     flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    minHeight: 320,
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    padding: 16,
+    gap: 12,
   },
   loadingText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#666',
   },
-  loadingOverlay: {
+  redirectOverlay: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    gap: 12,
   },
-  errorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFEBEE',
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
+  redirectText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#444',
   },
-  errorText: {
-    color: '#D32F2F',
-    fontSize: 13,
-    flex: 1,
+  footer: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
-  
+  footerText: {
+    fontSize: 12,
+    color: '#777',
+    textAlign: 'center',
+  },
 });

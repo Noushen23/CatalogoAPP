@@ -1,6 +1,8 @@
 const { getConnection, query } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config/env');
+const apimaterialService = require('../services/apimaterialService');
+const { DEFAULT_PRICE_LIST, getPriceListByCity } = require('../utils/shippingCost');
 
 class Order {
 
@@ -208,7 +210,9 @@ class Order {
       fechaCreacion: this.fechaCreacion,
       fechaActualizacion: this.fechaActualizacion,
       itemsCount: itemsCount,
-      metodoPago: this.metodoPago
+      metodoPago: this.metodoPago,
+      usuario: this.usuario || undefined,
+      tns_kardex_id: this.tns_kardex_id || null
     };
   }
 
@@ -254,7 +258,8 @@ class Order {
         metodoPago,
         referenciaPago,
         notas,
-        items
+        items,
+        estado = 'pendiente'
       } = cartData;
 
       if (!items?.length) throw new Error('Carrito vacío');
@@ -285,7 +290,15 @@ class Order {
       const numeroOrden = await Order.generateOrderNumber(connection);
 
       const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
-      const costoEnvio = Order.calcularCostoEnvio(subtotal);
+      let ciudadEnvio = null;
+      if (direccionEnvioId) {
+        const [[direccion]] = await connection.execute(
+          'SELECT ciudad FROM direcciones_envio WHERE id = ?',
+          [direccionEnvioId]
+        );
+        ciudadEnvio = direccion?.ciudad || null;
+      }
+      const costoEnvio = await Order.calcularCostoEnvio(subtotal, ciudadEnvio);
       const total = subtotal + costoEnvio;
 
       const orderId = uuidv4();
@@ -296,9 +309,10 @@ class Order {
           subtotal, descuento, costo_envio, impuestos, total,
           metodo_pago, referencia_pago, notas,
           fecha_creacion, fecha_actualizacion
-        ) VALUES (?, ?, ?, ?, 'pendiente', ?, 0, ?, 0, ?, ?, ?, ?, NOW(), NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?, ?, NOW(), NOW())`,
         [
           orderId, numeroOrden, usuarioId, direccionEnvioId || null,
+          estado,
           subtotal, costoEnvio, total,
           metodoPago, referenciaPago, notas
         ]
@@ -348,14 +362,185 @@ class Order {
   /* =====================================================
    * COSTO DE ENVÍO
    * ===================================================== */
-  static calcularCostoEnvio(subtotal) {
-    if (subtotal >= 300000) return 0;
-    return 12000;
+  static async calcularCostoEnvio(subtotal, ciudadEnvio = null) {
+    const listaPrecio = getPriceListByCity(ciudadEnvio);
+    const domicilioMatId = config.shipping?.domicilioMatId;
+    const domicilioCodigo = config.shipping?.domicilioCodigo || 'DOMICILIO';
+
+    try {
+      // Consultar el artículo DOMICILIO en TNS (Apimaterial) con precios por lista
+      const material = domicilioMatId
+        ? await apimaterialService.getMaterialById(domicilioMatId, true)
+        : await apimaterialService.getMaterialByCodigo(domicilioCodigo, true);
+
+      // Obtener precio de la lista seleccionada o usar la última lista como fallback
+      const getPrecio = (lista) => {
+        const key = `PRECIO${lista}`;
+        const altKey = `precio${lista}`;
+        const raw = material?.[key] ?? material?.[altKey];
+        const value = Number(raw || 0);
+        return Number.isFinite(value) ? value : 0;
+      };
+
+      const precioLista = getPrecio(listaPrecio);
+      if (precioLista > 0) return precioLista;
+
+      const precioFallback = getPrecio(DEFAULT_PRICE_LIST);
+      return precioFallback > 0 ? precioFallback : 0;
+    } catch (error) {
+      console.warn('⚠️ [calcularCostoEnvio] Error consultando TNS:', error.message);
+      return 0;
+    }
+  }
+
+  /* =====================================================
+   * PREPARAR REINTENTO DE PAGO (TRANSACCIONAL)
+   * ===================================================== */
+  static async preparePaymentRetry(orderId, nuevaReferencia) {
+    const connection = await getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [[order]] = await connection.execute(
+        `SELECT id, estado FROM ordenes WHERE id = ? FOR UPDATE`,
+        [orderId]
+      );
+
+      if (!order) {
+        await connection.rollback();
+        return null;
+      }
+
+      if (order.estado !== 'cancelada') {
+        throw new Error('El pedido no está en estado cancelada');
+      }
+
+      const [items] = await connection.execute(
+        `SELECT producto_id, cantidad FROM items_orden WHERE orden_id = ?`,
+        [orderId]
+      );
+
+      for (const item of items) {
+        const [[product]] = await connection.execute(
+          `SELECT id, stock, activo FROM productos WHERE id = ? FOR UPDATE`,
+          [item.producto_id]
+        );
+
+        if (!product || !product.activo) {
+          throw new Error('Producto no disponible para reintentar el pago');
+        }
+
+        if (product.stock < item.cantidad) {
+          throw new Error('Stock insuficiente para reintentar el pago');
+        }
+      }
+
+      for (const item of items) {
+        await connection.execute(
+          `UPDATE productos SET stock = stock - ? WHERE id = ?`,
+          [item.cantidad, item.producto_id]
+        );
+      }
+
+      await connection.execute(
+        `UPDATE ordenes
+         SET estado = 'pendiente',
+             referencia_pago = ?,
+             fecha_actualizacion = NOW()
+         WHERE id = ?`,
+        [nuevaReferencia, orderId]
+      );
+
+      await connection.commit();
+      return await Order.findById(orderId);
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /* =====================================================
+   * MARCAR PAGO FALLIDO (TRANSACCIONAL)
+   * ===================================================== */
+  static async markPaymentFailed(orderId, reason = null) {
+    const connection = await getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [[order]] = await connection.execute(
+        `SELECT id, estado FROM ordenes WHERE id = ? FOR UPDATE`,
+        [orderId]
+      );
+
+      if (!order) {
+        await connection.rollback();
+        return null;
+      }
+
+      if (order.estado === 'cancelada') {
+        await connection.commit();
+        return await Order.findById(orderId);
+      }
+
+      if (order.estado !== 'pendiente') {
+        throw new Error('No se puede marcar el pago como fallido en este estado');
+      }
+
+      const [items] = await connection.execute(
+        `SELECT producto_id, cantidad FROM items_orden WHERE orden_id = ?`,
+        [orderId]
+      );
+
+      for (const item of items) {
+        await connection.execute(
+          `UPDATE productos SET stock = stock + ? WHERE id = ?`,
+          [item.cantidad, item.producto_id]
+        );
+      }
+
+      const notasFinal = reason ? `Pago fallido: ${reason}` : 'Pago fallido';
+      await connection.execute(
+        `UPDATE ordenes SET estado = 'cancelada', notas = ?, fecha_actualizacion = NOW() WHERE id = ?`,
+        [notasFinal, orderId]
+      );
+
+      await connection.commit();
+      return await Order.findById(orderId);
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 
   /* =====================================================
    * CANCELAR ORDEN (TRANSACCIONAL)
    * ===================================================== */
+  /**
+   * Actualiza el estado de la orden y sincroniza el valor en BD.
+   * @param {string} newStatus - Nuevo estado de la orden.
+   * @returns {Promise<Order>} - Instancia actualizada.
+   */
+  async updateStatus(newStatus) {
+    if (!newStatus) {
+      throw new Error('Estado de pedido inválido');
+    }
+
+    // Persistir el cambio en la base de datos y reflejarlo en la instancia.
+    await query(
+      'UPDATE ordenes SET estado = ?, fecha_actualizacion = NOW() WHERE id = ?',
+      [newStatus, this.id]
+    );
+    this.estado = newStatus;
+    this.fechaActualizacion = new Date().toISOString();
+    return this;
+  }
+
   async cancel(reason = null) {
     const connection = await getConnection();
 

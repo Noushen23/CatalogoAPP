@@ -790,7 +790,7 @@ const obtenerTodosPedidosAsignados = async (filtros = {}) => {
       }
     }
 
-    const countParams = params.slice(0, -2);
+    const countParams = [];
     const countWhereConditions = [
       `(e.id IS NULL OR e.estado NOT IN ('cancelada', 'fallida', 'entregada'))`,
       `o.estado NOT IN ('entregada', 'cancelada', 'reembolsada')`

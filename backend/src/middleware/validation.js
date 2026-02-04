@@ -21,7 +21,26 @@ const validateRegister = [
     .isEmail()
     .normalizeEmail()
     .withMessage('Email inválido'),
+  body('nombre')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Nombre debe tener entre 2 y 50 caracteres'),
+  body('segundoNombre')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Segundo nombre debe tener entre 2 y 50 caracteres'),
+  body('primerApellido')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Primer apellido debe tener entre 2 y 50 caracteres'),
+  body('segundoApellido')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Segundo apellido debe tener entre 2 y 50 caracteres'),
   body('nombreCompleto')
+    .optional()
     .trim()
     .isLength({ min: 2, max: 255 })
     .withMessage('Nombre completo debe tener entre 2 y 255 caracteres'),
@@ -42,11 +61,13 @@ const validateRegister = [
     .isLength({ max: 500 })
     .withMessage('Dirección no puede exceder 500 caracteres'),
   body('tipo_identificacion')
-    .optional()
+    .notEmpty()
+    .withMessage('Tipo de identificación es requerido')
     .isIn(['CC', 'NIT', 'CE', 'TR'])
-    .withMessage('Tipo de identificación inválido. Valores permitidos: CC, NIT, CE, PAS.'),
+    .withMessage('Tipo de identificación inválido. Valores permitidos: CC, NIT, CE, TR.'),
   body('numero_identificacion')
-    .optional()
+    .notEmpty()
+    .withMessage('Número de identificación es requerido')
     .trim()
     .isLength({ min: 5, max: 20 })
     .withMessage('Número de identificación debe tener entre 5 y 20 caracteres')

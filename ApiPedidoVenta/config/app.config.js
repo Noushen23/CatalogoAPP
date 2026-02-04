@@ -7,7 +7,7 @@ module.exports = {
     // Configuración del servidor
     server: {
         port: process.env.PORT || 51250,
-        host: process.env.HOST || '192.168.3.6',
+        host: process.env.HOST || '192.168.3.104',
         environment: process.env.NODE_ENV || 'development'
     },
 
@@ -84,5 +84,11 @@ module.exports = {
             monedasPermitidas: ['COP', 'USD', 'EUR'],
             formasPago: ['CO', 'CR', 'TR']
         }
+    },
+
+    // Configuración de envío (artículo DOMICILIO en TNS)
+    shipping: {
+        domicilioMatId: process.env.DOMICILIO_MATID || 1553,
+        domicilioCodigo: process.env.DOMICILIO_CODIGO || 'DOMICILIO'
     }
 };

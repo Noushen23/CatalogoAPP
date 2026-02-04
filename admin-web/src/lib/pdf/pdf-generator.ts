@@ -59,6 +59,7 @@ const estadosLabels: Record<string, string> = {
 
 // Mapeo de métodos de pago
 const metodoPagoLabels: Record<string, string> = {
+  wompi: 'Wompi',
   tarjeta: 'Tarjeta',
   pse: 'PSE',
   nequi: 'Nequi',

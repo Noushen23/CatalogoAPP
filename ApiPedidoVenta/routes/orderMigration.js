@@ -16,7 +16,6 @@ router.get('/test', (req, res) => {
         routes: [
             'GET /api/orders/:id/detail',
             'POST /api/orders/:id/migrate',
-            'POST /api/orders/:id/iniciar-preparacion',
             'PUT /api/orders/:id/retry-migration',
             'GET /api/orders/migration-status'
         ]
@@ -57,80 +56,6 @@ router.get('/:id/detail', validateOrderId, async (req, res, next) => {
             return res.status(404).json({
                 success: false,
                 error: 'ORDER_NOT_FOUND',
-                message: error.message
-            });
-        }
-        
-        res.status(500).json({
-            success: false,
-            error: 'INTERNAL_ERROR',
-            message: 'Error interno del servidor'
-        });
-    }
-});
-
-// POST /api/orders/:id/iniciar-preparacion - Migrar orden a TNS e iniciar preparación
-router.post('/:id/iniciar-preparacion', validateOrderId, async (req, res, next) => {
-    try {
-        const { id } = req.params;
-        const { 
-            usuario = 'MOBILE_USER',
-            codprefijo = 'PA',
-            codcomp = 'PV',
-            sucid = 1,
-            iniciarPreparacion = true
-        } = req.body;
-        
-        const options = {
-            usuario,
-            codprefijo,
-            codcomp,
-            sucid,
-            iniciarPreparacion
-        };
-        
-        const resultado = await orderMigrationService.migrateOrderToTNS(id, options);
-        
-        res.json({
-            success: true,
-            message: 'Orden migrada exitosamente a TNS',
-            data: {
-                ordenId: id,
-                tnsKardexId: resultado.kardexId,
-                tnsNumero: resultado.numero,
-                terceroId: resultado.terceroId,
-                vendedorId: resultado.vendedorId,
-                total: resultado.total,
-                itemsCount: resultado.itemsCount,
-                dekardexIds: resultado.dekardexIds,
-                iniciarPreparacion: resultado.iniciarPreparacion,
-                estado: resultado.iniciarPreparacion ? 'PREPARACION_INICIADA' : 'MIGRADO_PENDIENTE'
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error iniciando preparación:', error);
-        
-        if (error.message.includes('no encontrada')) {
-            return res.status(404).json({
-                success: false,
-                error: 'ORDER_NOT_FOUND',
-                message: error.message
-            });
-        }
-        
-        if (error.message.includes('no encontrado en TNS')) {
-            return res.status(400).json({
-                success: false,
-                error: 'TNS_ENTITY_NOT_FOUND',
-                message: error.message
-            });
-        }
-        
-        if (error.message.includes('no es cliente activo')) {
-            return res.status(400).json({
-                success: false,
-                error: 'INVALID_CLIENT',
                 message: error.message
             });
         }

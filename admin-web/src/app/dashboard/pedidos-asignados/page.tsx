@@ -13,7 +13,9 @@ const filtrosIniciales: {
   fecha_desde?: string;
   fecha_hasta?: string;
   orden_estado?: string;
-} = {};
+} = {
+  orden_estado: 'en_proceso',
+};
 
 export default function PedidosAsignadosPage() {
   const [filtros, setFiltros] = useState<{

@@ -31,18 +31,10 @@ import { CreateOrderFromCartRequest, ordersApi } from '@/core/api/ordersApi';
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { formatCurrency } from '@/presentation/utils';
 import { useCrearTransaccion } from '@/presentation/pagos/hooks/usePagos';
-import { PSEDataForm } from '@/presentation/pagos/components/PSEDataForm';
-import { NequiDataForm } from '@/presentation/pagos/components/NequiDataForm';
-import { BancolombiaDataForm } from '@/presentation/pagos/components/BancolombiaDataForm';
-import { DatosPSE, DatosNequi, DatosBancolombia } from '@/core/api/pagosApi';
 
 export default function CheckoutScreen() {
   // El ID de la dirección seleccionada se guardará aquí
   const [seleccionadaDireccionId, setSeleccionadaDireccionId] = useState<string | undefined>(undefined);
-  const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer'>('tarjeta');
-  const [pseData, setPseData] = useState<DatosPSE | null>(null);
-  const [nequiData, setNequiData] = useState<DatosNequi | null>(null);
-  const [bancolombiaData, setBancolombiaData] = useState<DatosBancolombia | null>(null);
   const [notes, setNotes] = useState('');
   const [direccionCost, setDireccionCost] = useState(0);
   const [direccionZona, setDireccionZona] = useState<string | null>(null);
@@ -162,26 +154,14 @@ export default function CheckoutScreen() {
 
     try {
       // Todos los métodos de pago requieren integración con Wompi
-      // NO crear pedido antes del pago - el pedido se creará cuando el pago sea aprobado
+      // El backend crea el pedido en estado "pendiente de pago" antes de abrir la pasarela
+      // Luego el webhook actualiza el estado según el resultado del pago
       // Crear transacción directamente con los datos del carrito
       const transaccionData: any = {
-        metodoPago: paymentMethod as 'tarjeta' | 'pse' | 'nequi' | 'bancolombia_transfer',
+        metodoPago: 'wompi',
         direccionEnvioId: seleccionadaDireccionId,
         notas: notes.trim() || undefined,
       };
-
-      // Agregar datos opcionales de los formularios para pre-llenar información en el Web Checkout
-      if (paymentMethod === 'pse' && pseData) {
-        transaccionData.datosPSE = pseData;
-      }
-
-      if (paymentMethod === 'nequi' && nequiData) {
-        transaccionData.datosNequi = nequiData;
-      }
-
-      if (paymentMethod === 'bancolombia_transfer' && bancolombiaData) {
-        transaccionData.datosBancolombia = bancolombiaData;
-      }
 
       const transaccionResult = await crearTransaccionMutation.mutateAsync(transaccionData);
 
@@ -212,6 +192,7 @@ export default function CheckoutScreen() {
             transaccionId: transaccionResult.transaccionId,
             urlCheckout: transaccionResult.urlCheckout,
             referencia: transaccionResult.referencia,
+            pedidoId: transaccionResult.pedidoId,
           },
         });
       } else {
@@ -377,81 +358,16 @@ export default function CheckoutScreen() {
           {/* Método de Pago */}
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Método de Pago</ThemedText>
-            
-            <View style={styles.paymentMethods}>
-              {[
-                { key: 'tarjeta', label: 'Tarjeta', icon: 'card-outline' },
-                { key: 'pse', label: 'PSE', icon: 'phone-portrait-outline' },
-                { key: 'nequi', label: 'Nequi', icon: 'wallet-outline' },
-                { key: 'bancolombia_transfer', label: 'Bancolombia', icon: 'swap-horizontal-outline' },
-              ].map((method) => (
-                <TouchableOpacity
-                  key={method.key}
-                  style={[
-                    styles.paymentMethod,
-                    paymentMethod === method.key && { backgroundColor: tintColor + '20', borderColor: tintColor }
-                  ]}
-                  onPress={() => setPaymentMethod(method.key as any)}
-                  disabled={isProcessing}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons 
-                    name={method.icon as any} 
-                    size={24} 
-                    color={paymentMethod === method.key ? tintColor : '#666'} 
-                  />
-                  <ThemedText style={[
-                    styles.paymentMethodLabel,
-                    paymentMethod === method.key && { color: tintColor }
-                  ]}>
-                    {method.label}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
+
+            <View style={styles.paymentMethodSingle}>
+              <Ionicons name="card-outline" size={22} color={tintColor} />
+              <View style={styles.paymentMethodTextContainer}>
+                <ThemedText style={styles.paymentMethodLabel}>PSE,NEQUI,BANCOLOMBIA</ThemedText>
+                <ThemedText style={styles.paymentMethodHelper}>
+                  Serás redirigido al checkout seguro de PSE,NEQUI,BANCOLOMBIA para completar el pago.
+                </ThemedText>
+              </View>
             </View>
-
-            {/* Formulario de datos PSE */}
-            {paymentMethod === 'pse' && (
-              <View style={styles.pseFormContainer}>
-                <PSEDataForm
-                  onDataSelected={(data) => {
-                    setPseData({
-                      tipoIdentificacion: data.tipoIdentificacion as DatosPSE['tipoIdentificacion'],
-                      numeroIdentificacion: data.numeroIdentificacion,
-                    });
-                  }}
-                  userNumeroIdentificacion={undefined}
-                  userTipoIdentificacion={undefined}
-                />
-              </View>
-            )}
-
-            {/* Formulario de datos Nequi */}
-            {paymentMethod === 'nequi' && (
-              <View style={styles.pseFormContainer}>
-                <NequiDataForm
-                  onDataSelected={(data) => {
-                    setNequiData({
-                      telefono: data.telefono,
-                    });
-                  }}
-                  userTelefono={user?.telefono}
-                />
-              </View>
-            )}
-
-            {/* Formulario de datos Bancolombia */}
-            {paymentMethod === 'bancolombia_transfer' && (
-              <View style={styles.pseFormContainer}>
-                <BancolombiaDataForm
-                  onDataSelected={(data) => {
-                    setBancolombiaData({
-                      descripcionPago: data.descripcionPago,
-                    });
-                  }}
-                />
-              </View>
-            )}
           </View>
 
           {/* Notas Adicionales */}
@@ -486,7 +402,7 @@ export default function CheckoutScreen() {
               <Ionicons name="checkmark-circle-outline" size={24} color="white" />
             )}
             <ThemedText style={styles.confirmButtonText}>
-              {isProcessing ? 'Procesando...' : `Confirmar Pedido - ${formatCurrency(total)}`}
+              {isProcessing ? 'Procesando...' : `Continuar a Pago - ${formatCurrency(total)}`}
             </ThemedText>
           </TouchableOpacity>
 
@@ -665,35 +581,28 @@ const styles = StyleSheet.create({
   halfWidth: {
     flex: 1,
   },
-  paymentMethods: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  paymentMethod: {
-    flex: 1,
-    minWidth: '45%',
+  paymentMethodSingle: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     backgroundColor: '#fff',
+    gap: 12,
+  },
+  paymentMethodTextContainer: {
+    flex: 1,
   },
   paymentMethodLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#1a1a1a',
   },
-  pseFormContainer: {
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+  paymentMethodHelper: {
+    fontSize: 12,
     color: '#666',
-    marginLeft: 8,
+    marginTop: 2,
   },
   confirmButton: {
     flexDirection: 'row',

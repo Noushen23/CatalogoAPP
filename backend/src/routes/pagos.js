@@ -9,10 +9,9 @@ const { handleValidationErrors } = require('../middleware/validation');
 // NOTA: NO se requiere pedidoId - el pedido se creará cuando el pago sea aprobado
 const validateCrearTransaccion = [
   body('metodoPago')
-    .notEmpty()
-    .withMessage('El método de pago es requerido')
-    .isIn(['tarjeta', 'pse', 'nequi', 'bancolombia_transfer'])
-    .withMessage('Método de pago inválido'),
+    .optional()
+    .isIn(['wompi'])
+    .withMessage('Método de pago inválido. Solo se permite Wompi'),
   body('direccionEnvioId')
     .optional()
     .isUUID()
@@ -21,37 +20,6 @@ const validateCrearTransaccion = [
     .optional()
     .isString()
     .withMessage('Las notas deben ser una cadena de texto'),
-  // Web Checkout: datos* son opcionales y solo sirven para pre-llenar información (customer-data)
-  body('datosPSE')
-    .optional()
-    .isObject()
-    .withMessage('Datos PSE deben ser un objeto'),
-  body('datosPSE.numeroIdentificacion')
-    .optional()
-    .isString()
-    .withMessage('Número de identificación debe ser una cadena de texto'),
-  body('datosPSE.descripcionPago')
-    .optional()
-    .isString()
-    .isLength({ max: 30 })
-    .withMessage('Descripción de pago no puede exceder 30 caracteres'),
-  body('datosNequi')
-    .optional()
-    .isObject()
-    .withMessage('Datos Nequi deben ser un objeto'),
-  body('datosNequi.telefono')
-    .optional()
-    .isString()
-    .withMessage('Teléfono debe ser una cadena de texto'),
-  body('datosBancolombia')
-    .optional()
-    .isObject()
-    .withMessage('Datos Bancolombia deben ser un objeto'),
-  body('datosBancolombia.descripcionPago')
-    .optional()
-    .isString()
-    .isLength({ max: 64 })
-    .withMessage('Descripción de pago no puede exceder 64 caracteres'),
   handleValidationErrors
 ];
 
@@ -60,6 +28,14 @@ const validateConsultarTransaccion = [
   param('idTransaccion')
     .notEmpty()
     .withMessage('ID de transacción es requerido'),
+  handleValidationErrors
+];
+
+// Validaciones para reintentar pago
+const validateReintentarPago = [
+  param('pedidoId')
+    .isUUID()
+    .withMessage('ID de pedido inválido'),
   handleValidationErrors
 ];
 
@@ -88,18 +64,18 @@ router.use(authenticateToken);
 router.post('/crear', validateCrearTransaccion, PagoController.crearTransaccion);
 
 /**
+ * @route   POST /api/v1/pagos/reintentar/:pedidoId
+ * @desc    Reintentar el pago de un pedido cancelado por pago fallido
+ * @access  Private (Usuario autenticado)
+ */
+router.post('/reintentar/:pedidoId', validateReintentarPago, PagoController.reintentarPago);
+
+/**
  * @route   GET /api/v1/pagos/consultar/:idTransaccion
  * @desc    Consultar el estado de una transacción de pago
  * @access  Private (Usuario autenticado)
  */
 router.get('/consultar/:idTransaccion', validateConsultarTransaccion, PagoController.consultarTransaccion);
-
-/**
- * @route   GET /api/v1/pagos/bancos-pse
- * @desc    Obtener lista de bancos disponibles para PSE
- * @access  Private (Usuario autenticado)
- */
-router.get('/bancos-pse', PagoController.obtenerBancosPSE);
 
 /**
  * @route   GET /api/v1/pagos/configuracion

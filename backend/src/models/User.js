@@ -7,6 +7,10 @@ class User {
     this.id = data.id;
     this.email = data.email;
     this.nombreCompleto = data.nombre_completo;
+    this.nombre = data.nombre;
+    this.segundoNombre = data.segundo_nombre;
+    this.primerApellido = data.primer_apellido;
+    this.segundoApellido = data.segundo_apellido;
     this.telefono = data.telefono;
     this.direccion = data.direccion;
     this.tipoIdentificacion = data.tipo_identificacion;
@@ -24,6 +28,10 @@ class User {
     const {
       email,
       nombreCompleto,
+      nombre,
+      segundoNombre,
+      primerApellido,
+      segundoApellido,
       password,
       telefono,
       direccion,
@@ -37,16 +45,20 @@ class User {
 
     const sql = `
       INSERT INTO usuarios (
-        id, email, nombre_completo, contrasena, telefono, 
+        id, email, nombre_completo, nombre, segundo_nombre, primer_apellido, segundo_apellido, contrasena, telefono, 
         direccion, tipo_identificacion, numero_identificacion, 
         rol, activo, email_verificado
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await query(sql, [
       id,
       email,
       nombreCompleto,
+      nombre || null,
+      segundoNombre || null,
+      primerApellido || null,
+      segundoApellido || null,
       hashedPassword,
       telefono || null,
       direccion || null,
@@ -123,7 +135,17 @@ class User {
 
   // Actualizar perfil
   async updateProfile(updateData) {
-    const allowedFields = ['nombre_completo', 'telefono', 'direccion', 'tipo_identificacion', 'numero_identificacion'];
+    const allowedFields = [
+      'nombre_completo',
+      'nombre',
+      'segundo_nombre',
+      'primer_apellido',
+      'segundo_apellido',
+      'telefono',
+      'direccion',
+      'tipo_identificacion',
+      'numero_identificacion'
+    ];
     const updates = [];
     const values = [];
 
@@ -226,6 +248,10 @@ class User {
       id: this.id,
       email: this.email,
       nombreCompleto: this.nombreCompleto,
+      nombre: this.nombre,
+      segundoNombre: this.segundoNombre,
+      primerApellido: this.primerApellido,
+      segundoApellido: this.segundoApellido,
       telefono: this.telefono,
       direccion: this.direccion,
       tipoIdentificacion: this.tipoIdentificacion,

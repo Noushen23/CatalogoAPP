@@ -27,7 +27,10 @@ const RegisterScreen = () => {
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      nombreCompleto: '',
+      nombre: '',
+      segundoNombre: '',
+      primerApellido: '',
+      segundoApellido: '',
       email: '',
       password: '',
       telefono: '',
@@ -36,11 +39,27 @@ const RegisterScreen = () => {
     },
   });
 
+  const buildNombreCompleto = (data: RegisterFormData) =>
+    [
+      data.primerApellido,
+      data.segundoApellido,
+      data.nombre,
+      data.segundoNombre,
+    ]
+      .map((value) => value?.trim())
+      .filter((value) => value && value.length > 0)
+      .join(' ');
+
   const onRegister = async (data: RegisterFormData) => {
     clearError(); // Limpiar errores previos
 
+    const nombreCompleto = buildNombreCompleto(data);
     const wasSuccessful = await register(
-      data.nombreCompleto, 
+      nombreCompleto,
+      data.nombre,
+      data.segundoNombre,
+      data.primerApellido,
+      data.segundoApellido,
       data.email, 
       data.password, 
       data.telefono || '',
@@ -97,8 +116,32 @@ const RegisterScreen = () => {
         <View style={{ marginTop: 20 }}>
           <ThemedControlledInput
             control={control}
-            name="nombreCompleto"
-            placeholder="Nombre completo"
+            name="nombre"
+            placeholder="Nombre"
+            autoCapitalize="words"
+            icon="person-outline"
+          />
+
+          <ThemedControlledInput
+            control={control}
+            name="segundoNombre"
+            placeholder="Segundo nombre"
+            autoCapitalize="words"
+            icon="person-outline"
+          />
+
+          <ThemedControlledInput
+            control={control}
+            name="primerApellido"
+            placeholder="Primer apellido"
+            autoCapitalize="words"
+            icon="person-outline"
+          />
+
+          <ThemedControlledInput
+            control={control}
+            name="segundoApellido"
+            placeholder="Segundo apellido"
             autoCapitalize="words"
             icon="person-outline"
           />

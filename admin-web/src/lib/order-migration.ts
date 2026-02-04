@@ -50,8 +50,7 @@ export interface MigrationResult {
   total: number;
   itemsCount: number;
   dekardexIds: number[];
-  iniciarPreparacion?: boolean;
-  estado: 'MIGRADO_PENDIENTE' | 'PREPARACION_INICIADA' | 'MIGRADO_EXITOSO';
+  estado: 'MIGRADO_PENDIENTE' | 'MIGRADO_EXITOSO';
 }
 
 export interface MigrationOptions {
@@ -59,7 +58,6 @@ export interface MigrationOptions {
   codprefijo?: string;
   codcomp?: string;
   sucid?: number;
-  iniciarPreparacion?: boolean;
 }
 
 export interface MigrationStatusItem {
@@ -100,17 +98,6 @@ export const OrderMigrationService = {
    */
   async getOrderMigrationDetails(orderId: string): Promise<ApiResponse<OrderMigrationDetails>> {
     const response = await migrationApiClient.get<ApiResponse<OrderMigrationDetails>>(`/orders/${orderId}/detail`);
-    return response.data;
-  },
-
-  /**
-   * Migra una orden a TNS e inicia preparación
-   */
-  async iniciarPreparacion(orderId: string, options?: MigrationOptions): Promise<ApiResponse<MigrationResult>> {
-    const response = await migrationApiClient.post<ApiResponse<MigrationResult>>(
-      `/orders/${orderId}/iniciar-preparacion`,
-      options || {}
-    );
     return response.data;
   },
 

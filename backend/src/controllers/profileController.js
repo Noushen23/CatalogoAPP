@@ -314,13 +314,41 @@ class ProfileController {
   static async updateUserInfo(req, res) {
     try {
       const userId = req.user.id;
-      const { nombreCompleto, telefono, direccion, tipoIdentificacion, numeroIdentificacion } = req.body;
+      const { nombreCompleto, nombre, segundoNombre, primerApellido, segundoApellido, telefono, direccion, tipoIdentificacion, numeroIdentificacion } = req.body;
 
       // Validaciones básicas
       if (nombreCompleto && (nombreCompleto.length < 2 || nombreCompleto.length > 255)) {
         return res.status(400).json({
           success: false,
           message: 'El nombre completo debe tener entre 2 y 255 caracteres'
+        });
+      }
+
+      if (nombre && (nombre.length < 2 || nombre.length > 50)) {
+        return res.status(400).json({
+          success: false,
+          message: 'El nombre debe tener entre 2 y 50 caracteres'
+        });
+      }
+
+      if (segundoNombre && (segundoNombre.length < 2 || segundoNombre.length > 50)) {
+        return res.status(400).json({
+          success: false,
+          message: 'El segundo nombre debe tener entre 2 y 50 caracteres'
+        });
+      }
+
+      if (primerApellido && (primerApellido.length < 2 || primerApellido.length > 50)) {
+        return res.status(400).json({
+          success: false,
+          message: 'El primer apellido debe tener entre 2 y 50 caracteres'
+        });
+      }
+
+      if (segundoApellido && (segundoApellido.length < 2 || segundoApellido.length > 50)) {
+        return res.status(400).json({
+          success: false,
+          message: 'El segundo apellido debe tener entre 2 y 50 caracteres'
         });
       }
 
@@ -378,17 +406,34 @@ class ProfileController {
 
       const updateData = {};
       if (nombreCompleto !== undefined) updateData.nombre_completo = nombreCompleto;
+      if (nombre !== undefined) updateData.nombre = nombre;
+      if (segundoNombre !== undefined) updateData.segundo_nombre = segundoNombre;
+      if (primerApellido !== undefined) updateData.primer_apellido = primerApellido;
+      if (segundoApellido !== undefined) updateData.segundo_apellido = segundoApellido;
       if (telefono !== undefined) updateData.telefono = telefono;
       if (direccion !== undefined) updateData.direccion = direccion;
       if (tipoIdentificacion !== undefined) updateData.tipo_identificacion = tipoIdentificacion;
       if (numeroIdentificacion !== undefined) updateData.numero_identificacion = numeroIdentificacion;
 
-      await user.updateProfile(updateData);
+      if (nombre !== undefined || segundoNombre !== undefined || primerApellido !== undefined || segundoApellido !== undefined) {
+        const nombreCompletoFinal = [
+          primerApellido ?? user.primerApellido,
+          segundoApellido ?? user.segundoApellido,
+          nombre ?? user.nombre,
+          segundoNombre ?? user.segundoNombre
+        ]
+          .map((value) => (value || '').trim())
+          .filter((value) => value.length > 0)
+          .join(' ');
+        updateData.nombre_completo = nombreCompletoFinal;
+      }
+
+      const updatedUser = await user.updateProfile(updateData);
 
       res.json({
         success: true,
         message: 'Información del usuario actualizada exitosamente',
-        data: user.toPublicObject()
+        data: updatedUser.toPublicObject()
       });
     } catch (error) {
       console.error('Error al actualizar información del usuario:', error);

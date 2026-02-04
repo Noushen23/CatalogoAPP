@@ -19,11 +19,30 @@ export type LoginFormData = z.infer<typeof loginSchema>;
  * Esquema de validación para el formulario de registro
  */
 export const registerSchema = z.object({
-  nombreCompleto: z
+  nombre: z
     .string()
-    .min(1, 'El nombre completo es requerido')
-    .min(3, 'El nombre debe tener al menos 3 caracteres')
-    .max(100, 'El nombre no puede exceder 100 caracteres'),
+    .min(1, 'El nombre es requerido')
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(50, 'El nombre no puede exceder 50 caracteres'),
+  segundoNombre: z
+    .string()
+    .optional()
+    .refine(
+      (val) => val === undefined || val.trim().length === 0 || (val.trim().length >= 2 && val.trim().length <= 50),
+      'El segundo nombre debe tener entre 2 y 50 caracteres'
+    ),
+  primerApellido: z
+    .string()
+    .min(1, 'El primer apellido es requerido')
+    .min(2, 'El primer apellido debe tener al menos 2 caracteres')
+    .max(50, 'El primer apellido no puede exceder 50 caracteres'),
+  segundoApellido: z
+    .string()
+    .optional()
+    .refine(
+      (val) => val === undefined || val.trim().length === 0 || (val.trim().length >= 2 && val.trim().length <= 50),
+      'El segundo apellido debe tener entre 2 y 50 caracteres'
+    ),
   email: z
     .string()
     .min(1, 'El email es requerido')
@@ -36,19 +55,12 @@ export const registerSchema = z.object({
       'El teléfono debe tener entre 7 y 15 dígitos'
     ),
   tipoIdentificacion: z
-    .enum(['CC', 'NIT', 'CE', 'TR'])
-    .optional(),
+    .enum(['CC', 'NIT', 'CE', 'TR']),
   numeroIdentificacion: z
     .string()
-    .optional()
-    .refine(
-      (val) => !val || val.length === 0 || (val.length >= 5 && val.length <= 20),
-      'El número de identificación debe tener entre 5 y 20 caracteres'
-    )
-    .refine(
-      (val) => !val || val.length === 0 || /^[a-zA-Z0-9\-]+$/.test(val),
-      'El número de identificación solo puede contener letras, números y guiones'
-    ),
+    .min(5, 'El número de identificación debe tener entre 5 y 20 caracteres')
+    .max(20, 'El número de identificación debe tener entre 5 y 20 caracteres')
+    .regex(/^[a-zA-Z0-9\-]+$/, 'El número de identificación solo puede contener letras, números y guiones'),
   password: z
     .string()
     .min(6, 'La contraseña debe tener al menos 6 caracteres')

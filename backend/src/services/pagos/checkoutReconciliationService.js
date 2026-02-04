@@ -1,6 +1,8 @@
-const { query } = require('../config/database');
-const wompiService = require('./pagos/wompiService');
+const { query } = require('../../config/database');
+const wompiService = require('./wompiService');
 const CheckoutService = require('./checkoutService');
+const Order = require('../../models/Order');
+const emailService = require('../emailService');
 
 let isRunning = false;
 
@@ -17,7 +19,7 @@ class CheckoutReconciliationService {
 
       const intents = await query(
         `
-        SELECT id, referencia_pago, id_transaccion_wompi, estado_transaccion, fecha_creacion
+        SELECT id, referencia_pago, id_transaccion_wompi, estado_transaccion, fecha_creacion, fecha_expiracion
         FROM checkout_intents
         WHERE estado_transaccion = 'PENDING'
           AND fecha_creacion >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
@@ -28,6 +30,7 @@ class CheckoutReconciliationService {
 
       for (const intent of intents) {
         const referencia = intent.referencia_pago;
+        const idTransaccionWompi = intent.id_transaccion_wompi || null;
         let resultado = null;
 
         if (intent.id_transaccion_wompi) {
@@ -36,34 +39,79 @@ class CheckoutReconciliationService {
           resultado = await wompiService.consultarTransaccionPorReferencia(referencia);
         }
 
+        const ahora = new Date();
+        const expirado = intent.fecha_expiracion ? new Date(intent.fecha_expiracion) <= ahora : false;
+
         if (!resultado?.exito) {
           console.warn('⚠️ [Reconciliation] No se pudo consultar transacción:', {
             referencia,
-            error: resultado?.error
+            error: resultado?.error,
+            expirado
           });
+
+          if (expirado) {
+            await CheckoutService.actualizarEstado(intent.id, 'ERROR', idTransaccionWompi);
+            const pedidos = await query(
+              `SELECT id, estado FROM ordenes WHERE referencia_pago = ? LIMIT 1`,
+              [referencia]
+            );
+            if (pedidos.length > 0 && pedidos[0].estado === 'pendiente') {
+              const estadoAnterior = pedidos[0].estado;
+              await Order.markPaymentFailed(pedidos[0].id, 'Pago expirado');
+              const pedidoActualizado = await Order.findById(pedidos[0].id);
+              if (pedidoActualizado?.usuario?.email) {
+                await emailService.sendOrderStatusUpdateEmail(
+                  pedidoActualizado.usuario.email,
+                  pedidoActualizado.usuario.nombreCompleto || 'Usuario',
+                  pedidoActualizado.numeroOrden,
+                  pedidoActualizado.estado,
+                  estadoAnterior,
+                  pedidoActualizado.total,
+                  pedidoActualizado.fechaCreacion
+                );
+              }
+            }
+          }
           continue;
         }
 
         const estado = resultado.datos.estado;
-        const idTransaccionWompi = resultado.datos.id || intent.id_transaccion_wompi || null;
+        const idTransaccionWompiFinal = resultado.datos.id || idTransaccionWompi;
 
         if (estado === 'APPROVED') {
           try {
-            await CheckoutService.actualizarEstado(intent.id, 'APPROVED', idTransaccionWompi);
-            await CheckoutService.confirmarCheckout(intent.id);
-            console.log('✅ [Reconciliation] Pedido creado por conciliación:', {
+            const pedidoPrevio = await query(
+              `SELECT id, estado FROM ordenes WHERE referencia_pago = ? LIMIT 1`,
+              [referencia]
+            );
+            const estadoAnterior = pedidoPrevio.length ? pedidoPrevio[0].estado : 'pendiente';
+
+            await CheckoutService.actualizarEstado(intent.id, 'APPROVED', idTransaccionWompiFinal);
+            const pedido = await CheckoutService.confirmarCheckout(intent.id);
+            if (estadoAnterior !== 'confirmada' && pedido?.usuario?.email) {
+              await emailService.sendOrderStatusUpdateEmail(
+                pedido.usuario.email,
+                pedido.usuario.nombreCompleto || 'Usuario',
+                pedido.numeroOrden,
+                pedido.estado,
+                estadoAnterior,
+                pedido.total,
+                pedido.fechaCreacion
+              );
+            }
+            console.log('✅ [Reconciliation] Pedido confirmado por conciliación:', {
               intentId: intent.id,
               referencia,
-              idTransaccionWompi
+              idTransaccionWompi: idTransaccionWompiFinal
             });
             continue;
           } catch (error) {
             const message = error?.message || 'Error al crear pedido';
-            await CheckoutService.actualizarEstado(intent.id, 'ERROR', idTransaccionWompi);
+            await CheckoutService.actualizarEstado(intent.id, 'ERROR', idTransaccionWompiFinal);
             console.error('❌ [Reconciliation] Error al crear pedido desde intent:', {
               intentId: intent.id,
               referencia,
-              idTransaccionWompi,
+              idTransaccionWompi: idTransaccionWompiFinal,
               error: message
             });
             continue;
@@ -71,12 +119,58 @@ class CheckoutReconciliationService {
         }
 
         if (['DECLINED', 'VOIDED', 'ERROR'].includes(estado)) {
-          await CheckoutService.actualizarEstado(intent.id, estado, idTransaccionWompi);
+          await CheckoutService.actualizarEstado(intent.id, estado, idTransaccionWompiFinal);
+
+          const pedidos = await query(
+            `SELECT id, estado FROM ordenes WHERE referencia_pago = ? LIMIT 1`,
+            [referencia]
+          );
+          if (pedidos.length > 0 && pedidos[0].estado === 'pendiente') {
+            const estadoAnterior = pedidos[0].estado;
+            await Order.markPaymentFailed(pedidos[0].id, 'Pago rechazado o fallido');
+            const pedidoActualizado = await Order.findById(pedidos[0].id);
+            if (pedidoActualizado?.usuario?.email) {
+              await emailService.sendOrderStatusUpdateEmail(
+                pedidoActualizado.usuario.email,
+                pedidoActualizado.usuario.nombreCompleto || 'Usuario',
+                pedidoActualizado.numeroOrden,
+                pedidoActualizado.estado,
+                estadoAnterior,
+                pedidoActualizado.total,
+                pedidoActualizado.fechaCreacion
+              );
+            }
+          }
+
           console.log('❌ [Reconciliation] Intent marcado como rechazado:', {
             intentId: intent.id,
             referencia,
             estado
           });
+        }
+
+        if (estado === 'PENDING' && expirado) {
+          await CheckoutService.actualizarEstado(intent.id, 'ERROR', idTransaccionWompiFinal);
+          const pedidos = await query(
+            `SELECT id, estado FROM ordenes WHERE referencia_pago = ? LIMIT 1`,
+            [referencia]
+          );
+          if (pedidos.length > 0 && pedidos[0].estado === 'pendiente') {
+            const estadoAnterior = pedidos[0].estado;
+            await Order.markPaymentFailed(pedidos[0].id, 'Pago expirado');
+            const pedidoActualizado = await Order.findById(pedidos[0].id);
+            if (pedidoActualizado?.usuario?.email) {
+              await emailService.sendOrderStatusUpdateEmail(
+                pedidoActualizado.usuario.email,
+                pedidoActualizado.usuario.nombreCompleto || 'Usuario',
+                pedidoActualizado.numeroOrden,
+                pedidoActualizado.estado,
+                estadoAnterior,
+                pedidoActualizado.total,
+                pedidoActualizado.fechaCreacion
+              );
+            }
+          }
         }
       }
 

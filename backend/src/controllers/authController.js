@@ -46,13 +46,25 @@ class AuthController {
 
       const { 
         email, 
-        nombreCompleto, 
+        nombreCompleto,
+        nombre,
+        segundoNombre,
+        primerApellido,
+        segundoApellido,
         password, 
         telefono, 
         direccion,
         tipo_identificacion,
         numero_identificacion
       } = req.body;
+
+      const tipoIdentificacionNormalizado = String(tipo_identificacion || '').trim().toUpperCase();
+      const numeroIdentificacionNormalizado = String(numero_identificacion || '').trim();
+
+      const nombreCompletoFinal = [primerApellido, segundoApellido, nombre, segundoNombre]
+        .map((value) => (value || '').trim())
+        .filter((value) => value.length > 0)
+        .join(' ') || (nombreCompleto || '').trim();
 
       // Verificar si el usuario ya existe por email
       const existingUser = await User.findByEmail(email);
@@ -64,10 +76,10 @@ class AuthController {
       }
 
       // Verificar si el documento ya existe (si se proporciona)
-      if (tipo_identificacion && numero_identificacion) {
+      if (tipoIdentificacionNormalizado && numeroIdentificacionNormalizado) {
         const existingUserByDocument = await User.findByDocument(
-          tipo_identificacion,
-          numero_identificacion
+          tipoIdentificacionNormalizado,
+          numeroIdentificacionNormalizado
         );
         if (existingUserByDocument) {
           return res.status(409).json({
@@ -80,12 +92,16 @@ class AuthController {
       // Crear nuevo usuario
       const user = await User.create({
         email,
-        nombreCompleto,
+        nombreCompleto: nombreCompletoFinal,
+        nombre,
+        segundoNombre,
+        primerApellido,
+        segundoApellido,
         password,
         telefono,
         direccion,
-        tipo_identificacion,
-        numero_identificacion,
+        tipo_identificacion: tipoIdentificacionNormalizado || undefined,
+        numero_identificacion: numeroIdentificacionNormalizado || undefined,
         rol: 'cliente'
       });
 
