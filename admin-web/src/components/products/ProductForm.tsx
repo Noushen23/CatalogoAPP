@@ -214,8 +214,6 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
       const productData: CreateProductRequest = {
         ...formData,
         slug,
-        gender: 'Unisex' as any, // Valor por defecto
-        sizes: [] as any, // Array vacío por defecto
         esServicio: formData.esServicio || false,
         es_servicio: formData.esServicio || false, // Enviar ambos formatos para compatibilidad
         // Mantener categoryId como está

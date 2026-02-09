@@ -30,8 +30,6 @@ export interface Product {
   onOffer?: boolean | undefined
   images: ProductImage[]
   slug: string
-  gender: Gender
-  sizes: Size[]
   stock: number
   minStock?: number | undefined
   tags: string[]
@@ -63,31 +61,12 @@ export interface Category {
   updatedAt: string
 }
 
-export enum Gender {
-  Kid = 'kid',
-  Masculino = 'masculino',
-  Femenino = 'femenino',
-  Unisex = 'unisex'
-}
-
-export enum Size {
-  XS = 'XS',
-  S = 'S',
-  M = 'M',
-  L = 'L',
-  XL = 'XL',
-  XXL = 'XXL',
-  XXXL = 'XXXL'
-}
-
 export interface CreateProductRequest {
   title: string
   description: string
   price: number
   images: (string | ProductImage)[]
   slug?: string
-  gender: Gender
-  sizes: Size[]
   stock: number
   tags: string[]
   isActive: boolean

@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { apiAlt } from './api';
 
 export interface Ubicacion {
   latitud: number;
@@ -58,7 +58,7 @@ export const DeliveryService = {
    */
   async obtenerMisEntregas(estado?: string): Promise<Entrega[]> {
     const params = estado ? { estado } : {};
-    const response = await apiClient.get('/delivery/entregas', { params });
+    const response = await apiAlt.get('/delivery/entregas', { params });
     return response.data.data || [];
   },
 
@@ -66,7 +66,7 @@ export const DeliveryService = {
    * Obtener entrega por ID
    */
   async obtenerEntrega(id: string): Promise<Entrega> {
-    const response = await apiClient.get(`/delivery/entregas/${id}`);
+    const response = await apiAlt.get(`/delivery/entregas/${id}`);
     return response.data.data;
   },
 
@@ -74,7 +74,7 @@ export const DeliveryService = {
    * Iniciar entrega
    */
   async iniciarEntrega(id: string): Promise<Entrega> {
-    const response = await apiClient.post(`/delivery/entregas/${id}/iniciar`);
+    const response = await apiAlt.post(`/delivery/entregas/${id}/iniciar`);
     return response.data.data;
   },
 
@@ -82,7 +82,7 @@ export const DeliveryService = {
    * Registrar llegada
    */
   async registrarLlegada(id: string, latitud: number, longitud: number): Promise<Entrega> {
-    const response = await apiClient.post(`/delivery/entregas/${id}/llegada`, {
+    const response = await apiAlt.post(`/delivery/entregas/${id}/llegada`, {
       latitud,
       longitud,
     });
@@ -100,7 +100,7 @@ export const DeliveryService = {
       observaciones?: string;
     }
   ): Promise<Entrega> {
-    const response = await apiClient.post(`/delivery/entregas/${id}/completar`, datos);
+    const response = await apiAlt.post(`/delivery/entregas/${id}/completar`, datos);
     return response.data.data;
   },
 
@@ -112,7 +112,7 @@ export const DeliveryService = {
     motivo: string,
     motivoDetalle?: string
   ): Promise<{ success: boolean; reasignado: boolean; nueva_entrega_id?: string; repartidor_nuevo?: any }> {
-    const response = await apiClient.post(`/delivery/entregas/${id}/cancelar`, {
+    const response = await apiAlt.post(`/delivery/entregas/${id}/cancelar`, {
       motivo,
       motivo_detalle: motivoDetalle,
     });
@@ -123,7 +123,7 @@ export const DeliveryService = {
    * Obtener coordenadas desde dirección
    */
   async obtenerCoordenadas(direccion: string): Promise<{ latitud: number; longitud: number }> {
-    const response = await apiClient.get('/delivery/mapas/coordenadas', {
+    const response = await apiAlt.get('/delivery/mapas/coordenadas', {
       params: { direccion },
     });
     return response.data.data;
@@ -137,7 +137,7 @@ export const DeliveryService = {
     destino: { latitud: number; longitud: number },
     waypoints?: Array<{ latitud: number; longitud: number }>
   ): Promise<RutaCalculada> {
-    const response = await apiClient.post('/delivery/mapas/ruta', {
+    const response = await apiAlt.post('/delivery/mapas/ruta', {
       origen,
       destino,
       waypoints: waypoints || [],
@@ -150,7 +150,7 @@ export const DeliveryService = {
    */
   async obtenerRepartidoresDisponibles(ordenId?: string): Promise<RepartidorDisponible[]> {
     const params = ordenId ? { orden_id: ordenId } : {};
-    const response = await apiClient.get('/repartidores/disponibles', { params });
+    const response = await apiAlt.get('/repartidores/disponibles', { params });
     return response.data.data || [];
   },
 
@@ -162,7 +162,7 @@ export const DeliveryService = {
     repartidorId: string,
     motivoReasignacion?: string
   ): Promise<{ success: boolean; entrega: Entrega; repartidor: any; reasignado?: boolean }> {
-    const response = await apiClient.post('/delivery/pedidos/asignar-repartidor', {
+    const response = await apiAlt.post('/delivery/pedidos/asignar-repartidor', {
       orden_id: ordenId,
       repartidor_id: repartidorId,
       motivo_reasignacion: motivoReasignacion || undefined,
@@ -202,7 +202,7 @@ export const DeliveryService = {
       : '/delivery/pedidos/asignados';
 
     try {
-      const response = await apiClient.get(url);
+      const response = await apiAlt.get(url);
       const data = response.data?.data;
       
       // Asegurar que siempre retornamos un objeto válido
@@ -245,7 +245,7 @@ export const DeliveryService = {
     condiciones?: any;
     razon?: string;
   }> {
-    const response = await apiClient.post('/delivery/pedidos/marcar-montado-carro', {
+    const response = await apiAlt.post('/delivery/pedidos/marcar-montado-carro', {
       orden_id: ordenId,
     });
     return response.data.data;
@@ -260,7 +260,7 @@ export const DeliveryService = {
     condiciones?: any;
     razon?: string;
   }> {
-    const response = await apiClient.post('/delivery/pedidos/verificar-estado-proceso', {
+    const response = await apiAlt.post('/delivery/pedidos/verificar-estado-proceso', {
       orden_id: ordenId,
     });
     return response.data.data;

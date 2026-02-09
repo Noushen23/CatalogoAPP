@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { apiAlt } from './api';
 
 export interface Repartidor {
   id: string;
@@ -74,7 +74,7 @@ export const RepartidoresService = {
 
     const queryString = params.toString();
     const url = queryString ? `/repartidores?${queryString}` : '/repartidores';
-    const response = await apiClient.get<{ success: boolean; data: PaginatedRepartidores }>(url);
+    const response = await apiAlt.get<{ success: boolean; data: PaginatedRepartidores }>(url);
     return response.data.data;
   },
 
@@ -82,7 +82,7 @@ export const RepartidoresService = {
    * Obtener un repartidor por ID
    */
   async obtenerRepartidorPorId(id: string): Promise<RepartidorDetalle> {
-    const response = await apiClient.get<{ success: boolean; data: RepartidorDetalle }>(`/repartidores/${id}`);
+    const response = await apiAlt.get<{ success: boolean; data: RepartidorDetalle }>(`/repartidores/${id}`);
     return response.data.data;
   },
 
@@ -90,7 +90,7 @@ export const RepartidoresService = {
    * Obtener estadísticas de repartidores
    */
   async obtenerEstadisticas(): Promise<EstadisticasRepartidores> {
-    const response = await apiClient.get<{ success: boolean; data: EstadisticasRepartidores }>('/repartidores/estadisticas');
+    const response = await apiAlt.get<{ success: boolean; data: EstadisticasRepartidores }>('/repartidores/estadisticas');
     return response.data.data;
   },
 };

@@ -3,7 +3,6 @@ import { AdminProductsService } from '@/lib/admin-products'
 import { AdminCategoriesService } from '@/lib/admin-categories'
 import { MaterialTNS } from '@/lib/apimaterial-service'
 import { CONFIG } from '@/lib/config'
-import { Gender, Size } from '@/types'
 import { useQueryClient } from '@tanstack/react-query'
 
 // Hook para obtener categorías disponibles
@@ -82,8 +81,6 @@ export function useCreateProductFromApimaterialWithCategory() {
           `unidad-${material.UNIDAD}`
         ],
         images: [], // Se pueden agregar imágenes por separado
-        gender: Gender.Unisex,
-        sizes: [] as Size[]
       }
       
       console.log('📋 Datos del producto a crear:', {

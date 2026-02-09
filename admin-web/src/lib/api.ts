@@ -1,66 +1,81 @@
-import axios, { AxiosError, AxiosResponse } from 'axios'
-import { getApiUrl } from './config'
+import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios'
+import { CONFIG, getApiUrl, getApiUrlAlt } from './config'
 
-// Usar configuración centralizada
-const API_URL = getApiUrl()
-
-export const api = axios.create({
-  baseURL: API_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  maxRedirects: 3,
-  validateStatus: (status) => status < 500,
-})
-
-// Interceptor de request para agregar token de auth
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('admin_token')
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// Interceptor de response para manejo de errores
-api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('API Error:', {
-        message: error.message,
-        status: error.response?.status,
-        url: error.config?.url,
-        method: error.config?.method,
-      })
-    }
-
-    const status = error.response?.status
-
-    if (status === 401) {
-      console.log('⚠️ API: Error 401 - Token inválido o expirado')
-      localStorage.removeItem('admin_token')
-      localStorage.removeItem('admin_user')
-      delete api.defaults.headers.common['Authorization']
-      // Solo redirigir si no estamos ya en la página de login
-      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-        console.log('🔄 API: Redirigiendo al login desde:', window.location.pathname)
-        window.location.href = '/'
-      }
-    } else if (status === 403) {
+const attachInterceptors = (client: AxiosInstance) => {
+  // Interceptor de request para agregar token de auth
+  client.interceptors.request.use(
+    (config) => {
       if (typeof window !== 'undefined') {
-        alert('No tienes permisos para realizar esta acción')
+        const token = localStorage.getItem(CONFIG.STORAGE.TOKEN)
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
       }
-    } else if (typeof status === 'number' && status >= 500) {
-      if (typeof window !== 'undefined') {
-        alert('Error del servidor. Por favor, intenta más tarde.')
-      }
-    }
+      return config
+    },
+    (error) => Promise.reject(error)
+  )
 
-    return Promise.reject(error)
-  }
-)
+  // Interceptor de response para manejo de errores
+  client.interceptors.response.use(
+    (response: AxiosResponse) => response,
+    (error: AxiosError) => {
+      if (process.env.NODE_ENV === 'development') {
+        const errorData = error.response?.data || {}
+        console.error('API Error:', {
+          message: error.message,
+          status: error.response?.status,
+          url: error.config?.url,
+          method: error.config?.method,
+          data: errorData,
+          responseData: error.response?.data,
+        })
+      }
+
+      const status = error.response?.status
+
+      if (status === 401) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(CONFIG.STORAGE.TOKEN)
+          localStorage.removeItem(CONFIG.STORAGE.USER)
+          delete client.defaults.headers.common['Authorization']
+          // Solo redirigir si no estamos ya en la página de login
+          if (!window.location.pathname.includes('/auth/login') && window.location.pathname !== '/') {
+            window.location.href = '/'
+          }
+        }
+      } else if (status === 403) {
+        if (typeof window !== 'undefined') {
+          alert('No tienes permisos para realizar esta acción')
+        }
+      } else if (typeof status === 'number' && status >= 500) {
+        if (typeof window !== 'undefined') {
+          alert('Error del servidor. Por favor, intenta más tarde.')
+        }
+      }
+
+      return Promise.reject(error)
+    }
+  )
+}
+
+const createApiClient = (baseURL: string): AxiosInstance => {
+  const client = axios.create({
+    baseURL,
+    timeout: CONFIG.API.TIMEOUT,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    maxRedirects: 3,
+    validateStatus: (status) => status >= 200 && status < 300,
+  })
+
+  attachInterceptors(client)
+  return client
+}
+
+// Cliente principal (/api/v1)
+export const api = createApiClient(getApiUrl())
+
+// Cliente alterno (/api)
+export const apiAlt = createApiClient(getApiUrlAlt())

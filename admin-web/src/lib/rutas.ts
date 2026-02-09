@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { apiAlt } from './api';
 
 export interface Ruta {
   id: string;
@@ -81,7 +81,7 @@ export const RutasService = {
    * Crear una nueva ruta (admin/moderator)
    */
   async crearRuta(payload: CrearRutaPayload): Promise<{ ruta_id: string }> {
-    const response = await apiClient.post('/rutas/crear', payload);
+    const response = await apiAlt.post('/rutas/crear', payload);
     return response.data.data;
   },
 
@@ -89,7 +89,7 @@ export const RutasService = {
    * Obtener ruta activa del repartidor autenticado
    */
   async obtenerMiRuta(): Promise<Ruta> {
-    const response = await apiClient.get('/rutas/mi-ruta');
+    const response = await apiAlt.get('/rutas/mi-ruta');
     return response.data.data;
   },
 
@@ -97,7 +97,7 @@ export const RutasService = {
    * Cambiar orden de pedidos en la ruta (repartidor)
    */
   async cambiarOrdenRuta(payload: CambiarOrdenRutaPayload): Promise<{ ruta_alternativa_id: string }> {
-    const response = await apiClient.post('/rutas/cambiar-orden', payload);
+    const response = await apiAlt.post('/rutas/cambiar-orden', payload);
     return response.data.data;
   },
 
@@ -105,7 +105,7 @@ export const RutasService = {
    * Activar/desactivar ruta alternativa
    */
   async toggleRutaAlternativa(rutaId: string, activar: boolean): Promise<void> {
-    await apiClient.post('/rutas/toggle-alternativa', {
+    await apiAlt.post('/rutas/toggle-alternativa', {
       ruta_id: rutaId,
       activar,
     });
@@ -115,14 +115,14 @@ export const RutasService = {
    * Iniciar ruta (repartidor)
    */
   async iniciarRuta(rutaId: string): Promise<void> {
-    await apiClient.post('/rutas/iniciar', { ruta_id: rutaId });
+    await apiAlt.post('/rutas/iniciar', { ruta_id: rutaId });
   },
 
   /**
    * Finalizar ruta (repartidor)
    */
   async finalizarRuta(payload: FinalizarRutaPayload): Promise<void> {
-    await apiClient.post('/rutas/finalizar', payload);
+    await apiAlt.post('/rutas/finalizar', payload);
   },
 
   /**
@@ -143,7 +143,7 @@ export const RutasService = {
     const queryString = params.toString();
     const url = queryString ? `/rutas?${queryString}` : '/rutas';
 
-    const response = await apiClient.get(url);
+    const response = await apiAlt.get(url);
     // El backend devuelve: { success: true, message: ..., data: { rutas: [...], total: ... } }
     const responseData = response.data.data || response.data;
     console.log('Respuesta de obtenerTodasRutas:', responseData);

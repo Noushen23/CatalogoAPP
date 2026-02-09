@@ -8,7 +8,6 @@ export function useProducts(filters?: {
   search?: string
   status?: string
   category?: string
-  gender?: string
   price?: string
   stock?: string
 }) {

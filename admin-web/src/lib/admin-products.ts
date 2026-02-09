@@ -1,11 +1,9 @@
 import { api } from './api'
-import { Product, CreateProductRequest, ProductImage, Gender, Size } from '@/types'
+import { Product, CreateProductRequest, ProductImage } from '@/types'
 import { getApiBaseUrl, getImageUrl } from './config'
 
 // Tipos básicos para el servicio de productos
-export interface AdminProduct extends Omit<Product, 'gender' | 'sizes'> {
-  gender?: Gender
-  sizes?: Size[]
+export interface AdminProduct extends Product {
   isFeatured?: boolean
   fechaCreacion?: string
   fechaActualizacion?: string
@@ -259,8 +257,6 @@ export const AdminProductsService = {
           createdAt: product.createdAt || product.fecha_creacion || product.fechaCreacion || new Date().toISOString(),
           updatedAt: product.updatedAt || product.fecha_actualizacion || product.fechaActualizacion || new Date().toISOString(),
           // Propiedades opcionales de AdminProduct
-          gender: product.genero || product.gender || undefined,
-          sizes: Array.isArray(product.tallas) ? product.tallas : (product.sizes ? (Array.isArray(product.sizes) ? product.sizes : safeJsonParse(product.sizes)) : undefined)
         };
         
         

@@ -519,6 +519,51 @@ class Order {
   }
 
   /* =====================================================
+   * OBTENER ESTADÍSTICAS DE ÓRDENES
+   * ===================================================== */
+  static async getStats(usuarioId = null) {
+    try {
+      const params = [];
+      const whereClause = usuarioId ? 'WHERE usuario_id = ?' : '';
+      if (usuarioId) {
+        params.push(usuarioId);
+      }
+
+      const statsQuery = `
+        SELECT 
+          COUNT(*) as total_orders,
+          SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pending_orders,
+          SUM(CASE WHEN estado IN ('confirmada', 'en_proceso') THEN 1 ELSE 0 END) as confirmed_orders,
+          SUM(CASE WHEN estado = 'enviada' THEN 1 ELSE 0 END) as shipped_orders,
+          SUM(CASE WHEN estado = 'entregada' THEN 1 ELSE 0 END) as delivered_orders,
+          SUM(CASE WHEN estado IN ('cancelada', 'reembolsada') THEN 1 ELSE 0 END) as cancelled_orders,
+          COALESCE(SUM(CASE WHEN estado = 'entregada' THEN total ELSE 0 END), 0) as total_spent,
+          COALESCE(AVG(CASE WHEN estado = 'entregada' THEN total ELSE NULL END), 0) as average_order_value
+        FROM ordenes
+        ${whereClause}
+      `;
+
+      const result = await query(statsQuery, params);
+      if (!result.length) {
+        return {
+          total_orders: 0,
+          pending_orders: 0,
+          confirmed_orders: 0,
+          shipped_orders: 0,
+          delivered_orders: 0,
+          cancelled_orders: 0,
+          total_spent: 0,
+          average_order_value: 0
+        };
+      }
+
+      return result[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /* =====================================================
    * CANCELAR ORDEN (TRANSACCIONAL)
    * ===================================================== */
   /**

@@ -1,22 +1,3 @@
-import { Gender, Size } from '@/types'
-
-// Constantes de género
-export const GENDER_OPTIONS = [
-  { value: Gender.Unisex, label: 'Unisex' },
-  { value: Gender.Masculino, label: 'Masculino' },
-  { value: Gender.Femenino, label: 'Femenino' },
-] as const
-
-// Constantes de tallas
-export const SIZE_OPTIONS = [
-  { value: Size.XS, label: 'XS' },
-  { value: Size.S, label: 'S' },
-  { value: Size.M, label: 'M' },
-  { value: Size.L, label: 'L' },
-  { value: Size.XL, label: 'XL' },
-  { value: Size.XXL, label: 'XXL' },
-] as const
-
 // Constantes de estado de producto
 export const PRODUCT_STATUS_OPTIONS = [
   { value: 'active', label: 'Activo', color: 'text-green-600 bg-green-100' },

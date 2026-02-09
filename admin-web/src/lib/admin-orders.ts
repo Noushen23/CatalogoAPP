@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { apiAlt } from './api';
 
 /**
  * Tipos de datos para los pedidos en el panel de administración
@@ -182,7 +182,7 @@ export const AdminOrdersService = {
     const queryString = params.toString();
     const url = queryString ? `/orders?${queryString}` : '/orders';
     
-    const response = await apiClient.get<ApiResponse<PaginatedOrders>>(url);
+    const response = await apiAlt.get<ApiResponse<PaginatedOrders>>(url);
     return response.data;
   },
 
@@ -192,7 +192,7 @@ export const AdminOrdersService = {
    * @returns Una promesa que se resuelve con los detalles del pedido.
    */
   async getOrderById(orderId: string): Promise<ApiResponse<AdminOrderDetail>> {
-    const response = await apiClient.get<ApiResponse<AdminOrderDetail>>(`/orders/${orderId}`);
+    const response = await apiAlt.get<ApiResponse<AdminOrderDetail>>(`/orders/${orderId}`);
     return response.data;
   },
 
@@ -209,7 +209,7 @@ export const AdminOrdersService = {
     notas?: string,
     forceSyncTercero?: boolean
   ): Promise<ApiResponse<AdminOrderDetail>> {
-    const response = await apiClient.put<ApiResponse<AdminOrderDetail>>(
+    const response = await apiAlt.put<ApiResponse<AdminOrderDetail>>(
       `/orders/${orderId}/status`,
       { estado: newStatus, notas, forceSyncTercero }
     );
@@ -221,7 +221,7 @@ export const AdminOrdersService = {
    * @returns Una promesa que se resuelve con las estadísticas.
    */
   async getOrderStats(): Promise<ApiResponse<OrderStats>> {
-    const response = await apiClient.get<ApiResponse<OrderStats>>('/orders/stats');
+    const response = await apiAlt.get<ApiResponse<OrderStats>>('/orders/stats');
     return response.data;
   },
 

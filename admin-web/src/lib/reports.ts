@@ -1,5 +1,5 @@
 /* COMENTADO - Módulo de reportes deshabilitado
-import { apiClient } from './api-client';
+import { apiAlt } from './api';
 
 export type TipoReporte = 'diario' | 'semanal' | 'mensual' | 'personalizado';
 
@@ -46,7 +46,7 @@ export interface GenerarReportePayload {
 
 export const ReportsService = {
   async generarReporte(payload: GenerarReportePayload): Promise<ReporteEntrega> {
-    const response = await apiClient.post('/delivery/reportes/generar', payload);
+    const response = await apiAlt.post('/delivery/reportes/generar', payload);
     return response.data.data;
   },
 
@@ -56,7 +56,7 @@ export const ReportsService = {
     tipo?: TipoReporte;
     repartidor_id?: string;
   }): Promise<ReportesResponse> {
-    const response = await apiClient.get('/delivery/reportes', { params });
+    const response = await apiAlt.get('/delivery/reportes', { params });
     return {
       data: response.data.data || [],
       pagination: response.data.pagination,
@@ -64,7 +64,7 @@ export const ReportsService = {
   },
 
   async obtenerReporte(id: string): Promise<ReporteEntrega> {
-    const response = await apiClient.get(`/delivery/reportes/${id}`);
+    const response = await apiAlt.get(`/delivery/reportes/${id}`);
     return response.data.data;
   },
 };

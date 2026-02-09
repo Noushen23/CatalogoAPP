@@ -134,7 +134,6 @@ async function actualizarProductoExistente(producto) {
         slug = ?,
         descripcion = ?,
         precio = ?,
-        precio_oferta = ?,
         stock = ?,
         activo = ?,
         fecha_actualizacion = CURRENT_TIMESTAMP
@@ -145,7 +144,6 @@ async function actualizarProductoExistente(producto) {
 
     // Validar y preparar datos según las restricciones de la tabla
     const precio = Math.max(0, producto.PRECIO1 || 0);
-    const precioOferta = producto.PRECIO2 && producto.PRECIO2 > 0 && producto.PRECIO2 < precio ? producto.PRECIO2 : null;
     const stock = Math.max(0, producto.EXISTENC || 0);
 
     const params = [
@@ -153,7 +151,6 @@ async function actualizarProductoExistente(producto) {
       slug,
       producto.DESCRIP,
       precio,
-      precioOferta,
       stock,
       producto.INACTIVO === "N" || producto.INACTIVO === null ? 1 : 0,
       producto.CODIGO,
@@ -168,8 +165,9 @@ async function actualizarProductoExistente(producto) {
 }
 
 /* ============================================================
-   FUNCIÓN: CREAR NUEVO PRODUCTO
+   FUNCIÓN: CREAR NUEVO PRODUCTO (COMENTADA)
    ============================================================ */
+/*
 async function crearNuevoProducto(producto) {
   try {
     const uuid = crypto.randomUUID();
@@ -177,20 +175,19 @@ async function crearNuevoProducto(producto) {
 
     const query = `
       INSERT INTO productos (
-        id, nombre, slug, descripcion, precio, precio_oferta, categoria_id,
+        id, nombre, slug, descripcion, precio, categoria_id,
         stock, stock_minimo, activo, destacado, peso, dimensiones, etiquetas,
         codigo_barras, sku, fecha_creacion, fecha_actualizacion,
-        en_oferta, ventas_totales, calificacion_promedio, total_resenas
+        ventas_totales, calificacion_promedio, total_resenas
       )
       VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP, ?, ?, ?
       )
     `;
 
     // Validar y preparar datos según las restricciones de la tabla
     const precio = Math.max(0, producto.PRECIO1 || 0);
-    const precioOferta = producto.PRECIO2 && producto.PRECIO2 > 0 && producto.PRECIO2 < precio ? producto.PRECIO2 : null;
     const stock = Math.max(0, producto.EXISTENC || 0);
     const stockMinimo = Math.max(0, 5); // stock mínimo por defecto
     const peso = Math.max(0, 0.0); // peso por defecto
@@ -207,7 +204,6 @@ async function crearNuevoProducto(producto) {
       slug,
       producto.DESCRIP,
       precio,
-      precioOferta,
       null, // categoría
       stock,
       stockMinimo,
@@ -218,7 +214,6 @@ async function crearNuevoProducto(producto) {
       etiquetasJson, // etiquetas como JSON válido
       null, // código de barras
       producto.CODIGO, // sku (código TNS)
-      0, // en_oferta
       0, // ventas_totales
       0.00, // calificación_promedio
       0, // total_resenas
@@ -231,6 +226,7 @@ async function crearNuevoProducto(producto) {
     throw error;
   }
 }
+*/
 
 /* ============================================================
    FUNCIÓN: GENERAR SLUG
@@ -362,7 +358,7 @@ module.exports = {
   actualizarInventarioLocal,
   verificarProductoExistente,
   actualizarProductoExistente,
-  crearNuevoProducto,
+  // crearNuevoProducto,
   limpiarProductosObsoletos,
   generarSlug,
   SYNC_CONFIG,

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import * as Linking from 'expo-linking';
 import { WebView } from 'react-native-webview';
@@ -44,6 +44,7 @@ export default function WompiCheckoutScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const borderColor = '#e0e0e0';
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
 
   const webViewRef = useRef<WebView>(null);
   const redirectHandledRef = useRef(false);
@@ -94,6 +95,7 @@ export default function WompiCheckoutScreen() {
   }, []);
 
   const handleExitToCatalog = useCallback(async () => {
+    redirectHandledRef.current = true;
     await clearCheckoutStorage();
     router.replace({
       pathname: '/(customer)/catalog',
@@ -223,6 +225,9 @@ export default function WompiCheckoutScreen() {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!isFocused) {
+        return;
+      }
       if (redirectHandledRef.current || isHandlingRedirect) {
         return;
       }
@@ -244,13 +249,16 @@ export default function WompiCheckoutScreen() {
     });
 
     return unsubscribe;
-  }, [navigation, isHandlingRedirect, handleExitToCatalog]);
+  }, [navigation, isHandlingRedirect, handleExitToCatalog, isFocused]);
 
   useEffect(() => {
     const parentNavigation = navigation.getParent();
     if (!parentNavigation) return;
 
     const unsubscribe = (parentNavigation as any).addListener('tabPress', (e: any) => {
+      if (!isFocused) {
+        return;
+      }
       if (redirectHandledRef.current || isHandlingRedirect) {
         return;
       }
@@ -275,7 +283,7 @@ export default function WompiCheckoutScreen() {
     });
 
     return unsubscribe;
-  }, [navigation, isHandlingRedirect, handleExitToCatalog]);
+  }, [navigation, isHandlingRedirect, handleExitToCatalog, isFocused]);
 
   if (isRestoring) {
     return <FullScreenLoader message="Preparando pago..." />;

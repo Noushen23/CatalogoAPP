@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
+import { apiAlt } from '@/lib/api';
 import { Package, Calendar, MapPin, DollarSign, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -21,7 +21,7 @@ export default function HistorialPedidosPage() {
         params.append('repartidorId', repartidorId);
         params.append('page', page.toString());
         params.append('limit', '20');
-        const response = await apiClient.get(`/repartidores/historial?${params.toString()}`);
+        const response = await apiAlt.get(`/repartidores/historial?${params.toString()}`);
         
         if (!response.data.success) {
           throw new Error(response.data.message || 'Error al obtener historial');
