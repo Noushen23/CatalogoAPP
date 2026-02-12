@@ -27,8 +27,11 @@ export function useCrearRuta() {
       queryClient.invalidateQueries({ queryKey: ['pedidos-asignados-admin'] });
       toast.success('Ruta creada exitosamente');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al crear la ruta');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al crear la ruta';
+      toast.error(message);
     },
   });
 }
@@ -46,8 +49,11 @@ export function useCambiarOrdenRuta() {
       queryClient.invalidateQueries({ queryKey: ['rutas'] });
       toast.success('Orden de ruta modificado exitosamente. La ruta alternativa está activa.');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al modificar el orden de la ruta');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al modificar el orden de la ruta';
+      toast.error(message);
     },
   });
 }
@@ -69,8 +75,11 @@ export function useToggleRutaAlternativa() {
           : 'Ruta alternativa desactivada. Se usa la ruta principal.'
       );
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al cambiar estado de la ruta alternativa');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al cambiar estado de la ruta alternativa';
+      toast.error(message);
     },
   });
 }
@@ -90,8 +99,11 @@ export function useIniciarRuta() {
       queryClient.invalidateQueries({ queryKey: ['pedidos-asignados-admin'] });
       toast.success('Ruta iniciada exitosamente');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al iniciar la ruta');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al iniciar la ruta';
+      toast.error(message);
     },
   });
 }
@@ -111,8 +123,11 @@ export function useFinalizarRuta() {
       queryClient.invalidateQueries({ queryKey: ['pedidos-asignados-admin'] });
       toast.success('Ruta finalizada. Pedidos no entregados han sido liberados.');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al finalizar la ruta');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al finalizar la ruta';
+      toast.error(message);
     },
   });
 }

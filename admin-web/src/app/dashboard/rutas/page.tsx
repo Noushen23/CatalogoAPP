@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Route, Package,  Filter, RefreshCw, Loader2, Search, Grid3x3, List, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRutas, useIniciarRuta, useFinalizarRuta, useCambiarOrdenRuta, useToggleRutaAlternativa } from '@/hooks/useRutas';
-import { RutaPedido } from '@/lib/rutas';
+import { Ruta, RutaPedido } from '@/lib/rutas';
 import { RutaCard } from '@/components/rutas/RutaCard';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -32,15 +32,22 @@ export default function RutasPage() {
     limit: 100,
   });
 
+  type RutaWithExtras = Ruta & { numero_orden?: string };
+
   // Asegurar que rutas sea siempre un array
-  const rutas = Array.isArray(data?.rutas) ? data.rutas : Array.isArray(data) ? data : [];
+  const rutas = useMemo<RutaWithExtras[]>(() => {
+    if (Array.isArray((data as { rutas?: RutaWithExtras[] } | undefined)?.rutas)) {
+      return (data as { rutas?: RutaWithExtras[] }).rutas || [];
+    }
+    return Array.isArray(data) ? (data as RutaWithExtras[]) : [];
+  }, [data]);
   const total = data?.total || (Array.isArray(data) ? data.length : 0);
 
   // Filtrar rutas por búsqueda
   const rutasFiltradas = useMemo(() => {
     if (!busqueda.trim()) return rutas;
     const busquedaLower = busqueda.toLowerCase();
-    return rutas.filter((ruta: any) =>
+    return rutas.filter((ruta) =>
       (ruta.nombre?.toLowerCase() ?? '').includes(busquedaLower) ||
       (ruta.repartidor_nombre?.toLowerCase() ?? '').includes(busquedaLower) ||
       (ruta.descripcion?.toLowerCase() ?? '').includes(busquedaLower) ||
@@ -52,7 +59,7 @@ export default function RutasPage() {
   const rutasAgrupadas = useMemo(() => {
     if (!vistaAgrupada) return { todas: rutasFiltradas };
 
-    const grupos: Record<string, any[]> = {
+    const grupos: Record<string, RutaWithExtras[]> = {
       en_curso: [],
       activa: [],
       planificada: [],
@@ -61,7 +68,7 @@ export default function RutasPage() {
       otras: [],
     };
 
-    rutasFiltradas.forEach((ruta: any) => {
+    rutasFiltradas.forEach((ruta) => {
       if (typeof ruta.estado === 'string' && grupos.hasOwnProperty(ruta.estado)) {
         grupos[ruta.estado]?.push(ruta);
       } else {
@@ -93,12 +100,12 @@ export default function RutasPage() {
     try {
       await iniciarRutaMutation.mutateAsync(rutaId);
       refetch();
-    } catch (error) {
+    } catch {
       // El error ya se maneja en el hook
     }
   };
 
-  const handleAbrirFinalizar = (ruta: any) => {
+  const handleAbrirFinalizar = (ruta: RutaWithExtras) => {
     setRutaParaFinalizar(ruta.id);
     setPedidosEntregados(new Set());
     setPedidosNoEntregados(new Set());
@@ -138,7 +145,7 @@ export default function RutasPage() {
     });
   };
 
-  const handleFinalizarRuta = async (ruta: any) => {
+  const handleFinalizarRuta = async (ruta: RutaWithExtras) => {
     if (!rutaParaFinalizar) return;
 
     const totalSeleccionados = pedidosEntregados.size + pedidosNoEntregados.size;
@@ -168,12 +175,12 @@ export default function RutasPage() {
       setPedidosEntregados(new Set());
       setPedidosNoEntregados(new Set());
       refetch();
-    } catch (error) {
+    } catch {
       // El error ya se maneja en el hook
     }
   };
 
-  const iniciarEdicionOrden = (ruta: any) => {
+  const iniciarEdicionOrden = (ruta: RutaWithExtras) => {
     if (!ruta?.pedidos) return;
 
     // Obtener pedidos ordenados según ruta alternativa activa o principal
@@ -239,7 +246,7 @@ export default function RutasPage() {
     setOrdenEditado([...nuevoOrden]);
   };
 
-  const guardarOrden = async (ruta: any) => {
+  const guardarOrden = async (ruta: RutaWithExtras) => {
     if (!ruta) return;
 
     try {
@@ -251,7 +258,7 @@ export default function RutasPage() {
       setRutaEditandoOrden(null);
       setOrdenEditado([]);
       refetch();
-    } catch (error) {
+    } catch {
       // El error ya se maneja en el hook
     }
   };

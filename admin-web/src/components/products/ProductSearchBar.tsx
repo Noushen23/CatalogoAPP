@@ -95,7 +95,7 @@ export function ProductSearchBar({
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
               {totalResults} producto{totalResults !== 1 ? 's' : ''} encontrado{totalResults !== 1 ? 's' : ''}{' '}
-              para "{searchTerm}"
+              para &quot;{searchTerm}&quot;
             </span>
             <button
               onClick={onClearSearch}

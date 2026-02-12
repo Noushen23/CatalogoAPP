@@ -27,6 +27,9 @@ const statusLabels = {
 
 export default function RecentOrdersTable({ limit = 10 }: { limit?: number }) {
   const { data, isLoading, error } = useRecentOrders(limit);
+  const skeletonItems = Array.from({ length: 5 }, (_, idx) => ({
+    id: `skeleton-${idx}`,
+  }))
 
   if (isLoading) {
     return (
@@ -36,8 +39,8 @@ export default function RecentOrdersTable({ limit = 10 }: { limit?: number }) {
         </div>
         <div className="p-6">
           <div className="animate-pulse space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded"></div>
+            {skeletonItems.map((item) => (
+              <div key={item.id} className="h-12 bg-gray-200 rounded"></div>
             ))}
           </div>
         </div>

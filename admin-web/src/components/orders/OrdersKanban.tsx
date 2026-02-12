@@ -85,6 +85,10 @@ const statusColumns: StatusColumn[] = [
 export default function OrdersKanban() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  const skeletonItems = Array.from({ length: 3 }, (_, idx) => ({
+    id: `skeleton-${idx}`,
+  }))
   const [filters, setFilters] = useState<OrderFilters>({
     limit: 100,
     offset: 0,
@@ -109,7 +113,7 @@ export default function OrdersKanban() {
     return acc;
   }, {} as Record<OrderStatus, KanbanOrder[]>);
 
-  const handleFilterChange = (key: keyof OrderFilters, value: any) => {
+  const handleFilterChange = (key: keyof OrderFilters, value: OrderFilters[keyof OrderFilters]) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value || undefined,
@@ -258,8 +262,8 @@ export default function OrdersKanban() {
               <div className="animate-pulse">
                 <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
                 <div className="space-y-3">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-20 bg-gray-200 rounded"></div>
+                  {skeletonItems.map((item) => (
+                    <div key={item.id} className="h-20 bg-gray-200 rounded"></div>
                   ))}
                 </div>
               </div>

@@ -49,13 +49,15 @@ export const authService = {
         // Configurar token en las peticiones de API
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
-        console.log('✅ Login exitoso:', { email: user.email, role: user.roles })
+        console.warn('✅ Login exitoso:', { email: user.email, role: user.roles })
         return { user, token }
       }
       console.error('❌ Login: Respuesta inválida del servidor')
       return null
-    } catch (error: any) {
-      console.error('❌ Login error:', error.response?.data || error.message)
+    } catch (error) {
+      const responseData = (error as { response?: { data?: unknown } })?.response?.data
+      const message = error instanceof Error ? error.message : undefined
+      console.error('❌ Login error:', responseData || message || error)
       return null
     }
   },
@@ -66,7 +68,7 @@ export const authService = {
       const userStr = localStorage.getItem(USER_KEY)
 
       if (!token || !userStr) {
-        console.log('⚠️ checkStatus: No hay token o usuario en localStorage')
+        console.warn('⚠️ checkStatus: No hay token o usuario en localStorage')
         return null
       }
 
@@ -81,7 +83,7 @@ export const authService = {
       // Configurar token en las peticiones de API
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`
       
-      console.log('✅ checkStatus: Usuario autenticado:', { email: user.email, role: user.roles })
+      console.warn('✅ checkStatus: Usuario autenticado:', { email: user.email, role: user.roles })
       return { user, token }
     } catch (error) {
       console.error('❌ Error verificando estado:', error)

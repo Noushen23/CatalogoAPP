@@ -1,6 +1,7 @@
 const { getConnection, query } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config/env');
+const { getRequestBaseUrl } = require('../helpers/requestContext');
 const apimaterialService = require('../services/apimaterialService');
 const { DEFAULT_PRICE_LIST, getPriceListByCity } = require('../utils/shippingCost');
 
@@ -190,7 +191,11 @@ class Order {
       return imagePath;
     }
 
-    const baseUrl = config.apiBaseUrl;
+    const baseUrl =
+      getRequestBaseUrl() ||
+      config.apiBaseUrl ||
+      config.app?.url ||
+      'http://181.49.225.69:3001';
     return imagePath.startsWith('/')
       ? `${baseUrl}${imagePath}`
       : `${baseUrl}/${imagePath}`;

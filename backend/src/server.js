@@ -42,6 +42,10 @@ const usersRoutes = require('./routes/users');
 // Crear aplicación Express
 const app = express();
 
+// Contexto por request para construir URLs dinámicas (local/pública)
+const { requestContextMiddleware } = require('./helpers/requestContext');
+app.use(requestContextMiddleware);
+
 // Middleware de seguridad
 app.use(helmet());
 
@@ -275,7 +279,7 @@ const startServer = async () => {
       console.log(`📡 Puerto: ${config.port}`);
       console.log(`🌍 Entorno: ${config.nodeEnv}`);
       console.log(`🔗 URL App: ${config.app.url}`);
-      console.log(`🖼️  URL Base Imágenes (IP PÚBLICA): ${config.apiBaseUrl}`);
+      console.log(`🖼️  URL Base Imágenes (fallback): ${config.apiBaseUrl}`);
       console.log(`📊 Health Check: ${config.app.url}/health`);
       console.log(`🔐 API Auth: ${config.app.url}/api/v1/auth`);
       console.log(`🛍️  API Products: ${config.app.url}/api/v1/products`);

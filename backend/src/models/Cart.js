@@ -1,6 +1,7 @@
 const { query, getConnection } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config/env');
+const { getRequestBaseUrl } = require('../helpers/requestContext');
 
 class Cart {
   constructor(data) {
@@ -155,7 +156,11 @@ class Cart {
     }
     
     // Construir URL completa usando la configuración (igual que Product.toPublicObject)
-    const baseUrl = config.apiBaseUrl;
+    const baseUrl =
+      getRequestBaseUrl() ||
+      config.apiBaseUrl ||
+      config.app?.url ||
+      'http://181.49.225.69:3001';
     return imagePath.startsWith('/') 
       ? `${baseUrl}${imagePath}`
       : `${baseUrl}/${imagePath}`;

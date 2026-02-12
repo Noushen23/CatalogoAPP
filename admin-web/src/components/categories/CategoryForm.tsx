@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { AdminCategoriesService, AdminCategory } from '@/lib/admin-categories'
 import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
@@ -118,9 +119,10 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
       } else {
         setError('Error al guardar la categoría')
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error al guardar categoría:', error)
-      const errorMessage = error.response?.data?.message || error.message || 'Error al guardar la categoría'
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const errorMessage = responseMessage || (error instanceof Error ? error.message : 'Error al guardar la categoría')
       setError(errorMessage)
     } finally {
       setIsLoading(false)
@@ -231,10 +233,14 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
               {/* Preview de imagen */}
               {formData.image ? (
                 <div className="relative inline-block">
-                  <img
+                  <Image
                     src={formData.image}
                     alt="Preview"
+                    width={128}
+                    height={128}
+                    sizes="128px"
                     className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                    unoptimized
                   />
                   <button
                     type="button"

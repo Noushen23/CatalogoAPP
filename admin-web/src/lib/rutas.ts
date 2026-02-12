@@ -146,7 +146,7 @@ export const RutasService = {
     const response = await apiAlt.get(url);
     // El backend devuelve: { success: true, message: ..., data: { rutas: [...], total: ... } }
     const responseData = response.data.data || response.data;
-    console.log('Respuesta de obtenerTodasRutas:', responseData);
+    console.warn('Respuesta de obtenerTodasRutas:', responseData);
     return responseData;
   },
 };

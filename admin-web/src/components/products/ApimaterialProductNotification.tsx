@@ -1,16 +1,25 @@
 'use client'
 
 import React from 'react'
-import { CheckCircle, AlertCircle, Info, X, Database } from 'lucide-react'
+import { CheckCircle, AlertCircle, X, Database } from 'lucide-react'
+
+export interface ApimaterialMaterial {
+  CODIGO?: string
+  DESCRIP?: string
+  PRECIO1?: number
+  INACTIVO?: string
+}
+
+export interface ApimaterialProductResult {
+  success: boolean
+  message: string
+  data?: unknown
+  material?: ApimaterialMaterial
+  simulated?: boolean
+}
 
 interface ApimaterialProductNotificationProps {
-  result: {
-    success: boolean
-    message: string
-    data?: any
-    material?: any
-    simulated?: boolean
-  } | null
+  result: ApimaterialProductResult | null
   onClose: () => void
 }
 
@@ -19,6 +28,7 @@ export default function ApimaterialProductNotification({ result, onClose }: Apim
 
   const isSuccess = result.success
   const icon = isSuccess ? CheckCircle : AlertCircle
+  const hasSavedData = isSuccess && Boolean(result.data)
   const bgColor = isSuccess ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
   const textColor = isSuccess ? 'text-green-800' : 'text-red-800'
   const iconColor = isSuccess ? 'text-green-600' : 'text-red-600'
@@ -80,7 +90,7 @@ export default function ApimaterialProductNotification({ result, onClose }: Apim
             </div>
           )}
           
-          {result.data && result.success && (
+          {hasSavedData && (
             <div className="mt-2 p-2 bg-green-100 rounded text-xs">
               <div className="flex items-center space-x-1">
                 <Database className="h-3 w-3 text-green-600" />

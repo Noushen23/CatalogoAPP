@@ -9,8 +9,6 @@ import Map, { Layer, Marker, Source } from 'react-map-gl/mapbox';
 
 
 
-// Type declaration for react-map-gl/mapbox is in src/types/react-map-gl.d.ts
-import type { GeoJSON } from 'geojson';
 import { MapPin } from 'lucide-react';
 
 import { Entrega } from '@/lib/delivery';

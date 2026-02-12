@@ -127,7 +127,7 @@ export function CrearRutaModal({ pedidos, onCerrar, onRutaCreada }: CrearRutaMod
 
       onRutaCreada?.();
       onCerrar();
-    } catch (error) {
+    } catch {
       // El error ya se maneja en el hook
     }
   };
@@ -248,7 +248,7 @@ export function CrearRutaModal({ pedidos, onCerrar, onRutaCreada }: CrearRutaMod
                 <AlertCircle className="h-12 w-12 text-amber-500" />
                 <p className="mt-4 text-sm font-medium text-gray-900">No hay pedidos disponibles</p>
                 <p className="mt-2 text-xs text-gray-600">
-                  Los pedidos deben estar en estado "pendiente", "confirmada", "en_proceso" o "enviada"
+                  Los pedidos deben estar en estado &quot;pendiente&quot;, &quot;confirmada&quot;, &quot;en_proceso&quot; o &quot;enviada&quot;
                 </p>
               </div>
             ) : (

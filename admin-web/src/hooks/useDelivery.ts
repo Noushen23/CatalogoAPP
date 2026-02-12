@@ -38,8 +38,11 @@ export function useDeliveryMutations() {
       queryClient.invalidateQueries({ queryKey: ['entrega'] });
       toast.success('Entrega iniciada correctamente');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al iniciar entrega');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al iniciar entrega';
+      toast.error(message);
     },
   });
 
@@ -51,8 +54,11 @@ export function useDeliveryMutations() {
       queryClient.invalidateQueries({ queryKey: ['entrega'] });
       toast.success('Llegada registrada correctamente');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al registrar llegada');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al registrar llegada';
+      toast.error(message);
     },
   });
 
@@ -69,8 +75,11 @@ export function useDeliveryMutations() {
       queryClient.invalidateQueries({ queryKey: ['entrega'] });
       toast.success('Entrega completada correctamente');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al completar entrega');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al completar entrega';
+      toast.error(message);
     },
   });
 
@@ -93,8 +102,11 @@ export function useDeliveryMutations() {
         toast.success('Entrega cancelada. El pedido quedó pendiente de reasignación');
       }
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al cancelar entrega');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al cancelar entrega';
+      toast.error(message);
     },
   });
 
@@ -147,8 +159,11 @@ export function useAsignarPedidoARepartidor() {
         : 'Pedido asignado al repartidor correctamente';
       toast.success(message);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al asignar pedido al repartidor');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Error al asignar pedido al repartidor';
+      toast.error(message);
     },
   });
 }

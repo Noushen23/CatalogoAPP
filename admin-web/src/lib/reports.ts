@@ -19,7 +19,7 @@ export interface ReporteEntrega {
   tiempo_promedio_minutos?: number | null;
   distancia_total_km?: number | null;
   reasignaciones_totales: number;
-  datos_detallados?: any;
+  datos_detallados?: unknown;
   generado_por_id?: string | null;
   generado_por_nombre?: string | null;
   fecha_generacion: string;
@@ -89,7 +89,7 @@ export interface ReporteEntrega {
   tiempo_promedio_minutos?: number | null;
   distancia_total_km?: number | null;
   reasignaciones_totales: number;
-  datos_detallados?: any;
+  datos_detallados?: unknown;
   generado_por_id?: string | null;
   generado_por_nombre?: string | null;
   fecha_generacion: string;

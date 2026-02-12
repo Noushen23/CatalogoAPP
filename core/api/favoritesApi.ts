@@ -90,6 +90,7 @@ export const favoritesApi = {
     
     // Transformar imágenes de productos en favoritos
     if (response.success && response.data) {
+      const baseUrl = await API_CONFIG.getResolvedApiBaseUrl();
       response.data.favorites = response.data.favorites.map(favorite => {
         if (favorite.producto && favorite.producto.imagenes) {
           favorite.producto.images = favorite.producto.imagenes.map(img => {
@@ -98,7 +99,6 @@ export const favoritesApi = {
             
             // Si la URL es relativa, construir URL completa
             if (url && !url.startsWith('http')) {
-              const baseUrl = API_CONFIG.API_BASE_URL;
               url = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
             }
             

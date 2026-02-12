@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { TablaRepartidores } from '@/components/repartidores/TablaRepartidores';
 import { useEstadisticasRepartidores } from '@/hooks/useRepartidores';
-import { Truck, Users, Package, CheckCircle } from 'lucide-react';
-import { Search } from 'lucide-react';
+import { Truck, Users, Package, CheckCircle, Search } from 'lucide-react';
 
 export default function RepartidoresPage() {
   const [search, setSearch] = useState('');

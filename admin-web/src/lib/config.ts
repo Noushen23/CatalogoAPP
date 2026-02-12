@@ -8,22 +8,22 @@
 const SERVER_CONFIG = {
   // Servidor local (API principal)
   LOCAL: {
-    HOST: '192.168.3.104',
+    HOST: '192.168.1.120',
     PORT: 3001,
   },
   // Base de datos TNS (Apimaterial)
   TNS: {
-    HOST: '192.168.3.104',
+    HOST: '192.168.3.6',
     PORT: 51255,
   },
   // ApiPedidoVenta (Migración de pedidos)
   MIGRATION: {
-    HOST: '192.168.3.104',
+    HOST: '192.168.3.6',
     PORT: 51250,
   },
   // IP pública (producción)
   PUBLIC: {
-    HOST: '192.168.3.104',
+    HOST: '181.49.225.69',
     PORT: 3001,
   },
 } as const
@@ -59,7 +59,10 @@ export const CONFIG = {
 
   // Migration API Configuration
   // IMPORTANTE: ApiPedidoVenta corre en el puerto 51250, NO en 3001
-  // URL: http://192.168.3.6:51250/api
+
+
+
+  
   MIGRATION: {
     // Forzar URL correcta - ApiPedidoVenta en puerto 51250
     BASE_URL:
@@ -195,7 +198,7 @@ export const getMigrationApiUrl = (): string => {
   
   // Log en desarrollo para verificar URL
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔗 Migration API URL:', url)
+    console.warn('🔗 Migration API URL:', url)
   }
   
   return url

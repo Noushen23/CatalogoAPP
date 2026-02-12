@@ -33,6 +33,9 @@ export default function ProductDetailPage() {
     router.push('/dashboard/products')
   }
 
+  const headerSkeletonTabs = ['tab-1', 'tab-2', 'tab-3', 'tab-4']
+  const contentSkeletonBlocks = ['block-1', 'block-2', 'block-3']
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -52,8 +55,8 @@ export default function ProductDetailPage() {
             </div>
             <div className="border-t border-gray-200">
               <div className="flex space-x-8 px-6">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="animate-pulse py-4">
+                {headerSkeletonTabs.map((tabId) => (
+                  <div key={tabId} className="animate-pulse py-4">
                     <div className="h-4 bg-gray-200 rounded w-20"></div>
                   </div>
                 ))}
@@ -66,8 +69,8 @@ export default function ProductDetailPage() {
             <div className="px-6 py-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg p-6">
+                  {contentSkeletonBlocks.map((blockId) => (
+                    <div key={blockId} className="bg-gray-50 rounded-lg p-6">
                       <div className="animate-pulse">
                         <div className="h-6 bg-gray-200 rounded w-32 mb-4"></div>
                         <div className="space-y-3">
@@ -80,8 +83,8 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
                 <div className="space-y-6">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg p-6">
+                  {contentSkeletonBlocks.map((blockId) => (
+                    <div key={blockId} className="bg-gray-50 rounded-lg p-6">
                       <div className="animate-pulse">
                         <div className="h-6 bg-gray-200 rounded w-24 mb-4"></div>
                         <div className="space-y-3">

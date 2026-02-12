@@ -81,9 +81,10 @@ export default function OrderProcessConditions({
       if (onUpdate) {
         onUpdate();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error al marcar pedido como montado al carro:", error);
-      toast.error(error.message || "Error al marcar pedido como montado al carro");
+      const message = error instanceof Error ? error.message : "Error al marcar pedido como montado al carro";
+      toast.error(message);
     } finally {
       setIsMarkingAsLoaded(false);
     }
@@ -111,9 +112,10 @@ export default function OrderProcessConditions({
       if (onUpdate) {
         onUpdate();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error al verificar estado:", error);
-      toast.error(error.message || "Error al verificar estado");
+      const message = error instanceof Error ? error.message : "Error al verificar estado";
+      toast.error(message);
     } finally {
       setIsVerifying(false);
     }
@@ -127,7 +129,7 @@ export default function OrderProcessConditions({
     <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900">
-          Condiciones para "En Proceso"
+          Condiciones para &quot;En Proceso&quot;
         </h3>
         {todasCumplidas && (
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
@@ -333,8 +335,8 @@ export default function OrderProcessConditions({
       {todasCumplidas && order.estado === "confirmada" && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
-            ✅ Todas las condiciones están cumplidas. El pedido puede cambiar a "En Proceso".
-            Haz clic en "Verificar Estado" para actualizarlo automáticamente.
+            ✅ Todas las condiciones están cumplidas. El pedido puede cambiar a &quot;En Proceso&quot;.
+            Haz clic en &quot;Verificar Estado&quot; para actualizarlo automáticamente.
           </p>
         </div>
       )}

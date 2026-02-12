@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { RepartidoresService, FiltrosRepartidores, RepartidorDetalle, EstadisticasRepartidores } from '@/lib/repartidores';
+import { RepartidoresService, FiltrosRepartidores } from '@/lib/repartidores';
 
 /**
  * Hook para obtener lista de repartidores con filtros

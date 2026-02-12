@@ -26,25 +26,25 @@ export function Pagination({
 
   const getVisiblePages = () => {
     const delta = 2
-    const range = []
-    const rangeWithDots = []
+    const range: number[] = []
+    const rangeWithDots: Array<{ key: string; value: number | '...' }> = []
 
     for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
       range.push(i)
     }
 
     if (currentPage - delta > 2) {
-      rangeWithDots.push(1, '...')
+      rangeWithDots.push({ key: 'page-1', value: 1 }, { key: 'dots-left', value: '...' })
     } else {
-      rangeWithDots.push(1)
+      rangeWithDots.push({ key: 'page-1', value: 1 })
     }
 
-    rangeWithDots.push(...range)
+    rangeWithDots.push(...range.map((page) => ({ key: `page-${page}`, value: page })))
 
     if (currentPage + delta < totalPages - 1) {
-      rangeWithDots.push('...', totalPages)
+      rangeWithDots.push({ key: 'dots-right', value: '...' }, { key: `page-${totalPages}`, value: totalPages })
     } else if (totalPages > 1) {
-      rangeWithDots.push(totalPages)
+      rangeWithDots.push({ key: `page-${totalPages}`, value: totalPages })
     }
 
     return rangeWithDots
@@ -116,11 +116,11 @@ export function Pagination({
           </button>
 
           {/* Números de página */}
-          {visiblePages.map((page, index) => {
-            if (page === '...') {
+          {visiblePages.map((page) => {
+            if (page.value === '...') {
               return (
                 <span
-                  key={`dots-${index}`}
+                  key={page.key}
                   className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300"
                 >
                   ...
@@ -128,12 +128,12 @@ export function Pagination({
               )
             }
 
-            const pageNumber = page as number
+            const pageNumber = page.value
             const isCurrentPage = pageNumber === currentPage
 
             return (
               <button
-                key={pageNumber}
+                key={page.key}
                 onClick={() => onPageChange(pageNumber)}
                 className={`relative inline-flex items-center px-4 py-2 text-sm font-medium border ${
                   isCurrentPage

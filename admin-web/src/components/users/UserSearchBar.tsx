@@ -1,7 +1,6 @@
 'use client'
 
-import { SearchIcon } from '@/components/icons'
-import { XIcon } from '@/components/icons'
+import { SearchIcon, XIcon } from '@/components/icons'
 
 interface UserSearchBarProps {
   searchTerm: string

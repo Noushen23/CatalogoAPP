@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AdminCategoriesService, AdminCategory } from '@/lib/admin-categories'
 // Iconos reemplazados con SVGs inline
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export function CategoriesTable() {
   const router = useRouter()
@@ -98,13 +99,17 @@ export function CategoriesTable() {
     setDeleteCategory(null)
   }
 
+  const skeletonItems = Array.from({ length: 5 }, (_, idx) => ({
+    id: `skeleton-${idx}`,
+  }))
+
   if (isLoading) {
     return (
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:p-6">
           <div className="animate-pulse space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            {skeletonItems.map((item) => (
+              <div key={item.id} className="h-16 bg-gray-200 rounded"></div>
             ))}
           </div>
         </div>
@@ -178,10 +183,14 @@ export function CategoriesTable() {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-12 w-12">
                         {category.image ? (
-                          <img
+                          <Image
                             src={category.image}
                             alt={category.name}
+                            width={48}
+                            height={48}
+                            sizes="48px"
                             className="h-12 w-12 rounded-md object-cover border border-gray-200"
+                            unoptimized
                           />
                         ) : (
                           <div className="h-12 w-12 rounded-md bg-blue-100 flex items-center justify-center">
@@ -290,7 +299,7 @@ export function CategoriesTable() {
             
             <div className="px-6 py-4">
               <p className="text-sm text-gray-500">
-                ¿Estás seguro de que quieres eliminar la categoría <strong>"{deleteCategory.name}"</strong>?
+                ¿Estás seguro de que quieres eliminar la categoría <strong>&quot;{deleteCategory.name}&quot;</strong>?
               </p>
               <p className="text-sm text-gray-500 mt-2">
                 Esta acción no se puede deshacer.

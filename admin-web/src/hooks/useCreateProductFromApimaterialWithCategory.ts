@@ -52,8 +52,9 @@ export function useCreateProductFromApimaterialWithCategory() {
             duplicateValue: existsCheck.searchValue
           }
         }
-      } catch (error: any) {
-        console.warn('⚠️ Error verificando producto existente:', error.message)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+        console.warn('⚠️ Error verificando producto existente:', errorMessage)
         // Continuar con la creación si hay error en la verificación
       }
       
@@ -83,7 +84,7 @@ export function useCreateProductFromApimaterialWithCategory() {
         images: [], // Se pueden agregar imágenes por separado
       }
       
-      console.log('📋 Datos del producto a crear:', {
+      console.warn('📋 Datos del producto a crear:', {
         title: productData.title,
         price: productData.price,
         stock: productData.stock,
@@ -120,27 +121,29 @@ export function useCreateProductFromApimaterialWithCategory() {
           material: material,
           productId: result.data?.id
         }
-      } catch (error: any) {
+      } catch (error) {
+        const response = (error as { response?: { status?: number; data?: { message?: string } } })?.response
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
         console.error('❌ Error creando producto:', {
           material: material.CODIGO,
-          error: error.message,
-          status: error.response?.status,
-          details: error.response?.data
+          error: errorMessage,
+          status: response?.status,
+          details: response?.data
         })
         
         // Mensaje de error más amigable
-        let errorMessage = error.message
-        if (error.response?.status === 409) {
-          errorMessage = `El producto con código ${material.CODIGO} ya existe`
-        } else if (error.response?.status === 400) {
-          errorMessage = error.response?.data?.message || 'Datos de producto inválidos'
+        let friendlyMessage = errorMessage
+        if (response?.status === 409) {
+          friendlyMessage = `El producto con código ${material.CODIGO} ya existe`
+        } else if (response?.status === 400) {
+          friendlyMessage = response?.data?.message || 'Datos de producto inválidos'
         } else if (!navigator.onLine) {
-          errorMessage = 'Sin conexión a internet'
+          friendlyMessage = 'Sin conexión a internet'
         }
         
         return {
           success: false,
-          message: `Error: ${errorMessage}`,
+          message: `Error: ${friendlyMessage}`,
           data: null,
           material: material,
           error: error

@@ -1,5 +1,5 @@
 import { useOptimizedQuery, useOptimizedMutation } from './useApi'
-import { AdminProductsService, AdminProduct } from '@/lib/admin-products'
+import { AdminProductsService } from '@/lib/admin-products'
 import { CONFIG } from '@/lib/config'
 import { CreateProductRequest } from '@/types'
 

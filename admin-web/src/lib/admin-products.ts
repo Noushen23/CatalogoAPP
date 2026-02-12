@@ -33,6 +33,46 @@ export interface ProductFilters {
   sortOrder?: 'asc' | 'desc'
 }
 
+interface BackendProductImage {
+  id?: string
+  url?: string
+  url_imagen?: string
+  urlImagen?: string
+  orden?: number
+  alt_text?: string
+  esPrincipal?: boolean
+  es_principal?: boolean
+  [key: string]: unknown
+}
+
+interface BackendProduct {
+  id?: string
+  nombre?: string
+  title?: string
+  descripcion?: string
+  precio?: number
+  precioOferta?: number
+  enOferta?: boolean
+  stock?: number
+  stockMinimo?: number
+  isActive?: boolean
+  activo?: boolean
+  destacado?: boolean
+  sku?: string
+  codigoBarras?: string
+  imagenes?: Array<BackendProductImage | string>
+  etiquetas?: unknown
+  categoriaNombre?: string
+  categoriaId?: string
+  esServicio?: boolean
+  es_servicio?: boolean
+  fechaCreacion?: string
+  createdAt?: string
+  fechaActualizacion?: string
+  updatedAt?: string
+  [key: string]: unknown
+}
+
 // Helper para validar datos de producto
 const validateProductData = (data: CreateProductRequest): void => {
   if (!data.title || data.title.trim() === '') {
@@ -78,9 +118,9 @@ export const AdminProductsService = {
         Object.entries(filters || {}).filter(([_, value]) => value !== undefined && value !== '')
       )
       
-      console.log('📡 AdminProductsService - Llamando API con filters:', cleanParams)
+      console.warn('📡 AdminProductsService - Llamando API con filters:', cleanParams)
       const response = await api.get('/products', { params: cleanParams })
-      console.log('📡 AdminProductsService - Respuesta recibida:', response.data)
+      console.warn('📡 AdminProductsService - Respuesta recibida:', response.data)
       
       // El backend devuelve: { success: true, data: { products: [...], pagination: {...} } }
       if (response.data?.success && response.data.data?.products) {
@@ -88,7 +128,7 @@ export const AdminProductsService = {
         const pagination = response.data.data.pagination
         
         // El backend ya devuelve los productos en el formato correcto
-        const mappedProducts = products.map((p: any) => ({
+        const mappedProducts = products.map((p: BackendProduct) => ({
           id: p.id,
           title: p.nombre || p.title,
           description: p.descripcion || '',
@@ -127,7 +167,7 @@ export const AdminProductsService = {
         }
       }
       
-      console.log('❌ AdminProductsService: Formato de respuesta inesperado:', {
+      console.warn('❌ AdminProductsService: Formato de respuesta inesperado:', {
         hasData: !!response.data,
         hasSuccess: !!response.data?.success,
         hasDataData: !!response.data?.data,
@@ -160,7 +200,7 @@ export const AdminProductsService = {
         const product = response.data.data.product;
         
         // Función helper para parsear JSON de forma segura
-        const safeJsonParse = (str: any) => {
+        const safeJsonParse = (str: unknown) => {
           if (!str) return null;
           try {
             return typeof str === 'string' ? JSON.parse(str) : str;
@@ -173,7 +213,7 @@ export const AdminProductsService = {
         // Procesar imágenes del producto
         let images: ProductImage[] = [];
         if (Array.isArray(product.imagenes) && product.imagenes.length > 0) {
-          images = product.imagenes.map((img: any) => {
+          images = product.imagenes.map((img: BackendProductImage | string) => {
             // Si es un objeto con la nueva estructura
             if (typeof img === 'object' && img !== null) {
               // Obtener la URL de la imagen
@@ -267,7 +307,7 @@ export const AdminProductsService = {
         }
       }
       
-      console.log('❌ AdminProductsService: Formato de respuesta inesperado:', {
+      console.warn('❌ AdminProductsService: Formato de respuesta inesperado:', {
         hasData: !!response.data,
         hasSuccess: !!response.data?.success,
         hasDataData: !!response.data?.data,
@@ -289,7 +329,7 @@ export const AdminProductsService = {
       
       const response = await api.get(`/products/check-exists?${params.toString()}`)
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error checking product exists:', error)
       throw new Error('Error al verificar si el producto existe')
     }
@@ -303,6 +343,7 @@ export const AdminProductsService = {
       validateProductData(data)
       
       // Mapear datos del frontend al formato del backend
+      const codVinculacion = (data as { CodVinculacion?: string | number | null }).CodVinculacion ?? null
       const backendData = {
         nombre: data.title.trim(),
         descripcion: data.description || '',
@@ -315,7 +356,7 @@ export const AdminProductsService = {
         esServicio: data.esServicio || false,
         es_servicio: data.esServicio || data.es_servicio || false,
         sku: data.sku || null, // ← AQUÍ se mapea el SKU
-        CodVinculacion: (data as any).CodVinculacion || null, // ← AQUÍ se mapea el CodVinculacion
+        CodVinculacion: codVinculacion, // ← AQUÍ se mapea el CodVinculacion
         etiquetas: data.tags && data.tags.length > 0 ? data.tags : [],
         imagenes: data.images || []
       };
@@ -324,17 +365,17 @@ export const AdminProductsService = {
       const response = await api.post('/products', backendData)
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error creating product:', error)
       
       // Mejorar el manejo de errores
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
-      } else {
-        throw new Error('Error desconocido al crear el producto')
       }
+      throw new Error('Error desconocido al crear el producto')
     }
   },
 
@@ -351,6 +392,7 @@ export const AdminProductsService = {
       validateProductData(data)
       
       // Mapear datos del frontend al formato del backend
+      const codVinculacion = (data as { CodVinculacion?: string | number | null }).CodVinculacion ?? null
       const backendData = {
         nombre: data.title || '',
         descripcion: data.description || '',
@@ -362,7 +404,7 @@ export const AdminProductsService = {
         destacado: data.isFeatured || false,
         esServicio: data.esServicio !== undefined ? data.esServicio : false,
         es_servicio: data.esServicio !== undefined ? data.esServicio : (data.es_servicio !== undefined ? data.es_servicio : false),
-        CodVinculacion: (data as any).CodVinculacion || null, // ← AQUÍ se mapea el CodVinculacion
+        CodVinculacion: codVinculacion, // ← AQUÍ se mapea el CodVinculacion
         etiquetas: data.tags && data.tags.length > 0 ? data.tags : [],
         // Incluir imágenes solo si están presentes y son strings (URLs)
         // Si no hay imágenes nuevas, no enviar el campo para mantener las existentes
@@ -382,17 +424,17 @@ export const AdminProductsService = {
       }
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error updating product:', error)
       
       // Mejorar el manejo de errores
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
-      } else {
-        throw new Error('Error desconocido al actualizar el producto')
       }
+      throw new Error('Error desconocido al actualizar el producto')
     }
   },
 
@@ -430,7 +472,7 @@ export const AdminProductsService = {
         formData.append('images', file)
       })
       
-      console.log(`📤 Subiendo ${files.length} imagen(es)...`)
+      console.warn(`📤 Subiendo ${files.length} imagen(es)...`)
       
       const response = await api.post(`/products/${productId}/images`, formData, {
         headers: {
@@ -439,17 +481,17 @@ export const AdminProductsService = {
       })
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error uploading product images:', error)
       
       // Mejorar el manejo de errores
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
-      } else {
-        throw new Error('Error desconocido al subir las imágenes')
       }
+      throw new Error('Error desconocido al subir las imágenes')
     }
   },
 
@@ -469,17 +511,17 @@ export const AdminProductsService = {
       const response = await api.delete(`/products/${productId}/images/${imageIndex}`)
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error deleting product image:', error)
       
       // Mejorar el manejo de errores
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
-      } else {
-        throw new Error('Error desconocido al eliminar la imagen')
       }
+      throw new Error('Error desconocido al eliminar la imagen')
     }
   },
 
@@ -503,17 +545,17 @@ export const AdminProductsService = {
       const response = await api.patch(`/products/${productId}/images/${imageId}`, metadata)
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error updating image metadata:', error)
       
       // Mejorar el manejo de errores
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
-      } else {
-        throw new Error('Error desconocido al actualizar metadatos de imagen')
       }
+      throw new Error('Error desconocido al actualizar metadatos de imagen')
     }
   },
 
@@ -535,24 +577,24 @@ export const AdminProductsService = {
       })
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error reordering images:', error)
       
       // Mejorar el manejo de errores
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
-      } else {
-        throw new Error('Error desconocido al reordenar imágenes')
       }
+      throw new Error('Error desconocido al reordenar imágenes')
     }
   },
 
   // Marcar imagen como principal
   setMainImage: async (productId: string, imageId: string) => {
     try {
-      console.log('⭐ AdminProductsService: Marcando imagen como principal:', imageId, 'del producto:', productId)
+      console.warn('⭐ AdminProductsService: Marcando imagen como principal:', imageId, 'del producto:', productId)
       
       // Validar parámetros
       if (!productId || typeof productId !== 'string') {
@@ -566,17 +608,17 @@ export const AdminProductsService = {
       const response = await api.patch(`/products/${productId}/images/${imageId}/main`, {})
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error setting main image:', error)
       
       // Mejorar el manejo de errores
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
-      } else {
-        throw new Error('Error desconocido al marcar imagen como principal')
       }
+      throw new Error('Error desconocido al marcar imagen como principal')
     }
   },
 

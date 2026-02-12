@@ -103,7 +103,7 @@ export function GestionarRutaRepartidor() {
       });
       setEditandoOrden(false);
       refetch();
-    } catch (error) {
+    } catch {
       // El error ya se maneja en el hook
     }
   };
@@ -123,7 +123,7 @@ export function GestionarRutaRepartidor() {
     try {
       await iniciarRutaMutation.mutateAsync(ruta.id);
       refetch();
-    } catch (error) {
+    } catch {
       // El error ya se maneja en el hook
     }
   };
@@ -192,7 +192,7 @@ export function GestionarRutaRepartidor() {
       setPedidosEntregados(new Set());
       setPedidosNoEntregados(new Set());
       refetch();
-    } catch (error) {
+    } catch {
       // El error ya se maneja en el hook
     }
   };
@@ -226,10 +226,10 @@ export function GestionarRutaRepartidor() {
   
   // Debug: verificar condiciones
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔍 Estado de la ruta:', ruta.estado);
-    console.log('🔍 Puede modificar:', puedeModificar);
-    console.log('🔍 Editando orden:', editandoOrden);
-    console.log('🔍 Pedidos en ruta:', ruta.pedidos?.length || 0);
+    console.warn('🔍 Estado de la ruta:', ruta.estado);
+    console.warn('🔍 Puede modificar:', puedeModificar);
+    console.warn('🔍 Editando orden:', editandoOrden);
+    console.warn('🔍 Pedidos en ruta:', ruta.pedidos?.length || 0);
   }
 
   return (

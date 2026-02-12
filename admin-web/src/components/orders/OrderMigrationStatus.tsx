@@ -122,7 +122,7 @@ export default function OrderMigrationStatus({ orderId }: OrderMigrationStatusPr
             newStatus: 'en_proceso',
             notas: 'Pedido migrado a TNS',
           });
-        } catch (statusError) {
+        } catch {
           // El hook ya maneja el toast de error.
         }
       }

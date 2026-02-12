@@ -61,6 +61,16 @@ export interface Category {
   updatedAt: string
 }
 
+export interface CreateCategoryRequest {
+  name: string
+  description?: string
+  slug?: string
+  isActive?: boolean
+  image?: string
+  sortOrder?: number
+  parentId?: string
+}
+
 export interface CreateProductRequest {
   title: string
   description: string

@@ -13,7 +13,7 @@ export interface MigrationOptions {
 export interface MigrationResponse {
   success: boolean;
   data?: {
-    orden: any;
+    orden: MigrationOrder;
     migrationStatus: {
       ordenSincronizada: boolean;
       itemsSincronizados: number;
@@ -25,6 +25,15 @@ export interface MigrationResponse {
 }
 
 import { migrationApiClient } from '@/lib/migration-api-client'
+
+export interface MigrationOrder {
+  estado?: string;
+  tns_kardex_id?: string | number | null;
+  tns_numero?: string | number | null;
+  CLIENTE_NOMBRE?: string | null;
+  CLIENTE_NIT?: string | null;
+  tns_error_message?: string | null;
+}
 
 // Servicio para migración de pedidos
 class OrderMigrationService {
@@ -64,7 +73,7 @@ export function useMigrateOrder() {
     mutationFn: ({ orderId, options }: { orderId: string; options: MigrationOptions }) =>
       orderMigrationService.migrateOrder(orderId, options),
     
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidar queries relacionadas
       queryClient.invalidateQueries({ queryKey: ['order-migration', variables.orderId] });
       queryClient.invalidateQueries({ queryKey: ['admin-order', variables.orderId] });
@@ -77,10 +86,11 @@ export function useMigrateOrder() {
       
     },
     
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('❌ Error en migración:', error);
+      const message = error instanceof Error ? error.message : 'Error desconocido';
       
-      toast.error(`❌ Error al migrar pedido: ${error.message}`, {
+      toast.error(`❌ Error al migrar pedido: ${message}`, {
         duration: 5000,
         position: 'top-right',
       });
@@ -95,7 +105,7 @@ export function useRetryMigration() {
     mutationFn: ({ orderId, options }: { orderId: string; options: MigrationOptions }) =>
       orderMigrationService.retryMigration(orderId, options),
     
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidar queries relacionadas
       queryClient.invalidateQueries({ queryKey: ['order-migration', variables.orderId] });
       queryClient.invalidateQueries({ queryKey: ['admin-order', variables.orderId] });
@@ -108,10 +118,11 @@ export function useRetryMigration() {
       
     },
     
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('❌ Error al reintentar migración:', error);
+      const message = error instanceof Error ? error.message : 'Error desconocido';
       
-      toast.error(`❌ Error al reintentar migración: ${error.message}`, {
+      toast.error(`❌ Error al reintentar migración: ${message}`, {
         duration: 5000,
         position: 'top-right',
       });
@@ -124,7 +135,7 @@ export function useMigrationStatus(orderId: string) {
   const { data, isLoading, error } = useOrderMigrationDetails(orderId);
   
   const migrationStatus = data?.data?.migrationStatus;
-  const orden = data?.data?.orden;
+  const orden = data?.data?.orden as MigrationOrder | undefined;
   const isConfirmada = orden?.estado === 'confirmada';
   
   const status = useMemo(() => {

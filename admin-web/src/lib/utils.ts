@@ -23,7 +23,7 @@ export function formatDateTime(
       return 'Fecha inválida';
     }
     return format(date, formatStr, { locale: es });
-  } catch (error) {
+  } catch {
     return 'Fecha inválida';
   }
 }

@@ -66,8 +66,8 @@ export default function SalesOverview() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        {salesData.map((item, index) => (
-          <div key={index} className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+        {salesData.map((item) => (
+          <div key={item.label} className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
             <div className="flex items-center gap-2 mb-2">
               <item.icon className="h-4 w-4 text-blue-100" />
               <p className="text-xs text-blue-100">{item.label}</p>

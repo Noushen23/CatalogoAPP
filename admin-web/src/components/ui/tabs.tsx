@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useMemo } from 'react'
 
 interface TabsContextValue {
   value: string
@@ -17,8 +17,10 @@ interface TabsProps {
 }
 
 export function Tabs({ value, onValueChange, children, className }: TabsProps) {
+  const contextValue = useMemo(() => ({ value, onValueChange }), [value, onValueChange])
+
   return (
-    <TabsContext.Provider value={{ value, onValueChange }}>
+    <TabsContext.Provider value={contextValue}>
       <div className={`w-full ${className || ''}`}>
         {children}
       </div>

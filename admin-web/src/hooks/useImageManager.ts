@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AdminProductsService } from '@/lib/admin-products'
 import { ProductImage } from '@/types'
@@ -21,7 +21,7 @@ export function useImageManager({
   const [error, setError] = useState('')
 
   // Actualizar imágenes cuando cambien las iniciales
-  React.useEffect(() => {
+  useEffect(() => {
     setImages(initialImages)
   }, [initialImages])
 
@@ -31,7 +31,7 @@ export function useImageManager({
     setUploadingImages(true)
     
     try {
-      console.log(`📸 Subiendo ${files.length} imagen(es) para producto ${productId}`)
+      console.warn(`📸 Subiendo ${files.length} imagen(es) para producto ${productId}`)
       
       const response = await AdminProductsService.uploadProductImages(productId, files)
       
@@ -53,22 +53,24 @@ export function useImageManager({
       queryClient.invalidateQueries({ queryKey: ['admin-product', productId] })
       
       return updatedImages
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al subir las imágenes'
       console.error('❌ Error al subir imágenes:', error)
-      setError(error.message || 'Error al subir las imágenes')
+      setError(errorMessage)
       throw error
     } finally {
       setUploadingImages(false)
     }
   }, [productId, images, onImagesChange, queryClient])
 
-  // Eliminar imagen
-  const deleteImage = useCallback(async (imageId: string, imageIndex: number) => {
+  // Eliminar imagen (por índice en el array local)
+  const deleteImage = useCallback(async (imageIndex: number) => {
     setError('')
     
     try {
       
-      await AdminProductsService.deleteProductImage(productId, imageId)
+      // En el backend la ruta usa el índice de la imagen, no el ID
+      await AdminProductsService.deleteProductImage(productId, imageIndex)
       
       const updatedImages = images.filter((_, index) => index !== imageIndex)
       // Reordenar las imágenes restantes
@@ -85,9 +87,10 @@ export function useImageManager({
       queryClient.invalidateQueries({ queryKey: ['admin-product', productId] })
       
       return reorderedImages
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al eliminar la imagen'
       console.error('❌ Error al eliminar imagen:', error)
-      setError(error.message || 'Error al eliminar la imagen')
+      setError(errorMessage)
       throw error
     }
   }, [productId, images, onImagesChange, queryClient])
@@ -106,9 +109,10 @@ export function useImageManager({
       onImagesChange?.(updatedImages)
       
       return updatedImages
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar imagen principal'
       console.error('❌ Error al actualizar imagen principal:', error)
-      setError(error.message || 'Error al actualizar imagen principal')
+      setError(errorMessage)
       throw error
     }
   }, [images, onImagesChange])
@@ -118,6 +122,12 @@ export function useImageManager({
     try {
       const updatedImages = [...images]
       const [movedImage] = updatedImages.splice(fromIndex, 1)
+      
+      // Si el índice origen no es válido, no hacemos cambios
+      if (!movedImage) {
+        return images
+      }
+
       updatedImages.splice(toIndex, 0, movedImage)
       
       // Actualizar orden
@@ -130,9 +140,10 @@ export function useImageManager({
       onImagesChange?.(reorderedImages)
       
       return reorderedImages
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al reordenar imágenes'
       console.error('❌ Error al reordenar imágenes:', error)
-      setError(error.message || 'Error al reordenar imágenes')
+      setError(errorMessage)
       throw error
     }
   }, [images, onImagesChange])
@@ -148,9 +159,10 @@ export function useImageManager({
       onImagesChange?.(updatedImages)
       
       return updatedImages
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar metadatos'
       console.error('❌ Error al actualizar metadatos:', error)
-      setError(error.message || 'Error al actualizar metadatos')
+      setError(errorMessage)
       throw error
     }
   }, [images, onImagesChange])

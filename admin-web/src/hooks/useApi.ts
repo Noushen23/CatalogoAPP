@@ -8,6 +8,7 @@ export function useOptimizedQuery<T>(
     enabled?: boolean
     staleTime?: number
     gcTime?: number
+    refetchOnWindowFocus?: boolean
   }
 ) {
   return useQuery({
@@ -16,6 +17,7 @@ export function useOptimizedQuery<T>(
     staleTime: options?.staleTime ?? CONFIG.QUERY.STALE_TIME,
     gcTime: options?.gcTime ?? CONFIG.QUERY.GC_TIME,
     enabled: options?.enabled ?? true,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     retry: CONFIG.API.MAX_RETRIES,
   })
 }

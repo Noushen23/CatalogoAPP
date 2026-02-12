@@ -17,15 +17,15 @@ export function LoginForm() {
     setError('')
 
     try {
-      console.log('🔐 Intentando login con:', email)
+      console.warn('🔐 Intentando login con:', email)
       const result = await authService.login(email, password)
       
       if (result) {
-        console.log('✅ Login exitoso, usuario:', result.user)
+        console.warn('✅ Login exitoso, usuario:', result.user)
         // Verificar si tiene un rol permitido (admin, moderator, repartidor)
         const allowedRoles: string[] = ['admin', 'moderator', 'repartidor']
         if (allowedRoles.includes(result.user.roles)) {
-          console.log('✅ Rol permitido, redirigiendo al dashboard')
+          console.warn('✅ Rol permitido, redirigiendo al dashboard')
           // Usar replace en lugar de push para evitar que el usuario pueda volver atrás
           router.replace('/dashboard')
         } else {
@@ -38,9 +38,11 @@ export function LoginForm() {
         console.error('❌ Login falló: Credenciales incorrectas o error en el servidor')
         setError('Credenciales incorrectas. Por favor, verifica tu email y contraseña.')
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error en el proceso de login:', error)
-      const errorMessage = error.response?.data?.message || error.message || 'Error al iniciar sesión'
+      const errorMessage =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (error instanceof Error ? error.message : 'Error al iniciar sesión')
       setError(errorMessage)
     } finally {
       setIsLoading(false)

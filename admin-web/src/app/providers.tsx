@@ -10,9 +10,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       queries: {
         staleTime: 5 * 60 * 1000, // 5 minutes
         gcTime: 10 * 60 * 1000, // 10 minutes (antes cacheTime)
-        retry: (failureCount, error: any) => {
+        retry: (failureCount, error: unknown) => {
           // No reintentar en errores 4xx
-          if (error?.response?.status >= 400 && error?.response?.status < 500) {
+          const status = (error as { response?: { status?: number } })?.response?.status
+          if (typeof status === 'number' && status >= 400 && status < 500) {
             return false
           }
           return failureCount < 2

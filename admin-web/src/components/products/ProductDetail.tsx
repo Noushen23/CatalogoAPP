@@ -54,7 +54,7 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
     { id: 'images', name: 'Imágenes', icon: PhotoIcon },
     { id: 'analytics', name: 'Analíticas', icon: ChartBarIcon },
     { id: 'history', name: 'Historial', icon: ClockIcon }
-  ]
+  ] as const
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -119,7 +119,7 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
@@ -196,9 +196,9 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Etiquetas</h3>
                     <div className="flex flex-wrap gap-2">
-                      {product.tags.map((tag, index) => (
+                      {product.tags.map((tag) => (
                         <span
-                          key={index}
+                          key={tag}
                           className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                         >
                           <TagIcon className="h-3 w-3 mr-1" />

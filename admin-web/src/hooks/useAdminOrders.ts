@@ -103,15 +103,17 @@ export function useUpdateOrderStatus() {
 
       // Actualizar optimistamente el pedido individual
       if (previousOrder) {
-        queryClient.setQueryData(['admin-order', orderId], (old: any) => {
-          if (!old) return old;
+        queryClient.setQueryData(['admin-order', orderId], (old: unknown) => {
+          if (!old || typeof old !== 'object') return old;
+          const oldData = old as { data?: { estado?: OrderStatus; fechaActualizacion?: string; notas?: string } };
+          if (!oldData.data) return old;
           return {
-            ...old,
+            ...oldData,
             data: {
-              ...old.data,
+              ...oldData.data,
               estado: newStatus,
               fechaActualizacion: new Date().toISOString(),
-              notas: notas || old.data.notas,
+              notas: notas || oldData.data.notas,
             },
           };
         });
@@ -119,13 +121,15 @@ export function useUpdateOrderStatus() {
 
       // Actualizar optimistamente la lista de pedidos
       if (previousOrders) {
-        queryClient.setQueryData(['admin-orders'], (old: any) => {
-          if (!old) return old;
+        queryClient.setQueryData(['admin-orders'], (old: unknown) => {
+          if (!old || typeof old !== 'object') return old;
+          const oldData = old as { data?: { orders?: Array<{ id: string; estado?: OrderStatus; fechaActualizacion?: string }> } };
+          if (!oldData.data?.orders) return old;
           return {
-            ...old,
+            ...oldData,
             data: {
-              ...old.data,
-              orders: old.data.orders.map((order: any) =>
+              ...oldData.data,
+              orders: oldData.data.orders.map((order) =>
                 order.id === orderId
                   ? {
                       ...order,
@@ -201,7 +205,7 @@ export function useUpdateOrderStatus() {
     },
 
     // Rollback en caso de error
-    onError: (error: any, variables, context) => {
+    onError: (error: unknown, variables, context) => {
       // Restaurar el estado anterior
       if (context?.previousOrder) {
         queryClient.setQueryData(['admin-order', variables.orderId], context.previousOrder);
@@ -213,10 +217,11 @@ export function useUpdateOrderStatus() {
       console.error('❌ Error al actualizar el estado del pedido:', error);
       
       // Acceder al objeto de error completo de axios
-      const statusCode = error?.response?.status;
-      const errorMessage = error?.response?.data?.message || error?.message || 'Error desconocido';
-      const errorDetails = error?.response?.data?.details;
-      const errorData = error?.response?.data?.error;
+      const response = (error as { response?: { status?: number; data?: { message?: string; details?: unknown; error?: unknown } } })?.response;
+      const statusCode = response?.status;
+      const errorMessage = response?.data?.message || (error instanceof Error ? error.message : 'Error desconocido');
+      const errorDetails = response?.data?.details;
+      const errorData = response?.data?.error;
       
       // ⚠️ ERROR 503: Fallo de Sincronización con TNS/ApiTercero
       if (statusCode === 503) {
@@ -277,7 +282,7 @@ export function useUpdateOrderStatus() {
             position: 'top-right',
           }
         );
-      } else if (statusCode >= 500) {
+      } else if (typeof statusCode === 'number' && statusCode >= 500) {
         // Error interno del servidor
         toast.error(
           '❌ Error interno del servidor. Por favor, intente nuevamente.',

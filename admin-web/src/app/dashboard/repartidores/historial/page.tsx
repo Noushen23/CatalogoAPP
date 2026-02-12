@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { apiAlt } from '@/lib/api';
-import { Package, Calendar, MapPin, DollarSign, ArrowLeft } from 'lucide-react';
+import { Package, DollarSign, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HistorialPedidosPage() {
@@ -28,9 +28,11 @@ export default function HistorialPedidosPage() {
         }
         
         return response.data.data || { pedidos: [], estadisticas: {}, pagination: {} };
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error en query historial:', err);
-        throw new Error(err.response?.data?.message || err.message || 'Error al cargar el historial');
+        const responseMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar el historial';
+        throw new Error(responseMessage || errorMessage);
       }
     },
     enabled: !!repartidorId,
@@ -162,7 +164,18 @@ export default function HistorialPedidosPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {data?.pedidos && data.pedidos.length > 0 ? (
-                data.pedidos.map((pedido: any) => (
+                data.pedidos.map((pedido: { 
+                  entrega_id: string; 
+                  numero_orden?: string; 
+                  usuario_nombre?: string; 
+                  usuario_email?: string; 
+                  direccion?: string; 
+                  ciudad?: string; 
+                  departamento?: string; 
+                  entrega_estado?: string; 
+                  total?: number; 
+                  fecha_asignacion?: string; 
+                }) => (
                   <tr key={pedido.entrega_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">

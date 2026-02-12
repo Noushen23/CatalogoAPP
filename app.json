@@ -61,7 +61,8 @@
               "domainConfig": [
                 {
                   "domains": [
-                    "192.168.3.104"
+                    "181.49.225.69",
+                    "192.168.1.120"
                   ],
                   "cleartextTrafficPermitted": true
                 }
@@ -78,9 +79,13 @@
       "router": {
         "origin": false
       },
-      "EXPO_PUBLIC_API_URL": "http://192.168.3.104:3001/api/v1",
-      "EXPO_PUBLIC_API_BASE_URL": "http://192.168.3.104:3001",
-      "EXPO_PUBLIC_STAGE": "production",
+      "EXPO_PUBLIC_API_URL": "http://181.49.225.69:3001/api/v1",
+      "EXPO_PUBLIC_API_BASE_URL": "http://181.49.225.69:3001",
+      "EXPO_PUBLIC_API_URL_PUBLIC": "http://181.49.225.69:3001/api/v1",
+      "EXPO_PUBLIC_API_BASE_URL_PUBLIC": "http://181.49.225.69:3001",
+      "EXPO_PUBLIC_API_URL_LOCAL": "http://192.168.1.120:3001/api/v1",
+      "EXPO_PUBLIC_API_BASE_URL_LOCAL": "http://192.168.1.120:3001",
+      "EXPO_PUBLIC_STAGE": "auto",
       "eas": {
         "projectId": "bda43edf-60e4-4418-875a-0e057ac9c3a3"
       }

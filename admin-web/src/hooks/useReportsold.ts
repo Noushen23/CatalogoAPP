@@ -43,7 +43,7 @@ export function useGenerarReporte() {
       queryClient.invalidateQueries({ queryKey: ['reportes'] });
       toast.success('Reporte generado correctamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error(error.response?.data?.message || 'Error al generar reporte');
     },
   });

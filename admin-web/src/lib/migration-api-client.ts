@@ -11,7 +11,7 @@ const MIGRATION_API_URL = getMigrationApiUrl()
 
 // Log de la URL en desarrollo para verificación
 if (process.env.NODE_ENV === 'development') {
-  console.log('🔗 Migration API Client inicializado con URL:', MIGRATION_API_URL)
+console.warn('🔗 Migration API Client inicializado con URL:', MIGRATION_API_URL)
 }
 
 
@@ -48,7 +48,7 @@ migrationApiClient.interceptors.response.use(
     }
 
     const status = error.response?.status
-    const errorData = error.response?.data as any
+    const errorData = error.response?.data as { error?: string; message?: string } | undefined
 
     // Manejo específico de errores de migración
     if (status === 400) {

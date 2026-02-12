@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRepartidores } from '@/hooks/useRepartidores';
 import { Repartidor } from '@/lib/repartidores';
-import { Truck, Mail, Phone, MapPin, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { Truck, Phone, MapPin, CheckCircle, XCircle, Eye } from 'lucide-react';
 import Link from 'next/link';
 
 interface TablaRepartidoresProps {

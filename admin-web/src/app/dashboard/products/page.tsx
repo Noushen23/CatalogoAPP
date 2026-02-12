@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ProductsTable } from '@/components/products/ProductsTable'
 import ApimaterialSelector from '@/components/products/ApimaterialSelector'
-import ApimaterialProductNotification from '@/components/products/ApimaterialProductNotification'
+import ApimaterialProductNotification, { ApimaterialProductResult } from '@/components/products/ApimaterialProductNotification'
 import { ProductFilters } from '@/components/products/ProductFilters'
 import { Database, ImageIcon } from 'lucide-react'
 
@@ -14,7 +14,7 @@ export default function ProductsPage() {
   })
   
   const [isApimaterialOpen, setIsApimaterialOpen] = useState(false)
-  const [productCreationResult, setProductCreationResult] = useState<any>(null)
+  const [productCreationResult, setProductCreationResult] = useState<ApimaterialProductResult | null>(null)
 
   // Handler para actualizar filtros
   const handleFiltersChange = (newFilters: {
@@ -24,8 +24,8 @@ export default function ProductsPage() {
     setFilters(newFilters)
   }
   
-  const handleProductCreated = (result: any) => {
-    console.log('Producto creado desde Apimaterial:', result)
+  const handleProductCreated = (result: ApimaterialProductResult) => {
+    console.warn('Producto creado desde Apimaterial:', result)
     setProductCreationResult(result)
     setIsApimaterialOpen(false)
   }

@@ -7,9 +7,10 @@ import { useCheckProductExists } from '@/hooks/useCheckProductExists'
 import { MaterialTNS } from '@/lib/apimaterial-service'
 import { RefreshCw, Database, AlertCircle, CheckCircle, Loader2, Plus, X, ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import type { ApimaterialProductResult } from './ApimaterialProductNotification'
 
 interface ApimaterialSelectorProps {
-  onProductCreated?: (result: any) => void
+  onProductCreated?: (result: ApimaterialProductResult) => void
   onClose?: () => void
 }
 
@@ -101,9 +102,9 @@ export default function ApimaterialSelector({ onProductCreated, onClose }: Apima
           onProductCreated(result)
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error en handleCreateProduct:', error)
-      const errorMessage = error?.message || 'Error desconocido al crear producto'
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al crear producto'
       setError(errorMessage)
       
       const errorResult = {
@@ -160,11 +161,12 @@ export default function ApimaterialSelector({ onProductCreated, onClose }: Apima
     })
 
     // Refetch automático cuando cambia el estado de creación
+    const { isSuccess } = createProductMutation
     useEffect(() => {
-      if (createProductMutation.isSuccess) {
+      if (isSuccess) {
         refetch()
       }
-    }, [createProductMutation.isSuccess, refetch])
+    }, [isSuccess, refetch])
 
     if (checkingExistence) {
       return (
@@ -200,11 +202,12 @@ export default function ApimaterialSelector({ onProductCreated, onClose }: Apima
     })
 
     // Refetch automático cuando cambia el estado de creación
+    const { isSuccess } = createProductMutation
     useEffect(() => {
-      if (createProductMutation.isSuccess) {
+      if (isSuccess) {
         refetch()
       }
-    }, [createProductMutation.isSuccess, refetch])
+    }, [isSuccess, refetch])
 
     const isDisabled = createProductMutation.isPending || checkingExistence || existenceData?.exists
 

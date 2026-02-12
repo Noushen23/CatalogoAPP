@@ -14,6 +14,17 @@ export interface AdminCategory {
   sortOrder?: number
 }
 
+interface BackendCategory {
+  id?: string
+  nombre?: string
+  descripcion?: string
+  activa?: boolean
+  imagenUrl?: string
+  orden?: number
+  fechaCreacion?: string
+  fechaActualizacion?: string
+}
+
 export class AdminCategoriesService {
   // Obtener todas las categorías
   static async getCategories() {
@@ -22,7 +33,7 @@ export class AdminCategoriesService {
       
       // Mapear respuesta del backend al formato del frontend
       if (response.data.success && response.data.data.categories) {
-        const frontendCategories = response.data.data.categories.map((backendCategory: any) => ({
+        const frontendCategories = response.data.data.categories.map((backendCategory: BackendCategory) => ({
           id: backendCategory.id,
           name: backendCategory.nombre,
           description: backendCategory.descripcion,
@@ -70,7 +81,7 @@ export class AdminCategoriesService {
         activa: category.isActive ?? true
       }
 
-      console.log('Guardando categoría:', backendCategory)
+      console.warn('Guardando categoría:', backendCategory)
       
       const response = await api.post('/categories', backendCategory)
       return response.data
@@ -84,7 +95,7 @@ export class AdminCategoriesService {
   static async updateCategory(id: string, category: Partial<AdminCategory>) {
     try {
       // Mapear datos del frontend al formato del backend
-      const backendCategory: any = {}
+      const backendCategory: Partial<BackendCategory> = {}
       
       if (category.name !== undefined) backendCategory.nombre = category.name
       if (category.description !== undefined) backendCategory.descripcion = category.description

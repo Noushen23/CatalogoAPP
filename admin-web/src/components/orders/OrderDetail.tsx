@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useAdminOrder, useUpdateOrderStatus } from "@/hooks/useAdminOrders";
 import { useMigrateOrder } from "@/hooks/useOrderMigration";
 import { useQueryClient } from "@tanstack/react-query";
-import { OrderStatus } from "@/lib/admin-orders";
+import { AdminOrderDetail, OrderItem, OrderStatus } from "@/lib/admin-orders";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -91,19 +91,19 @@ const getLoadingState = (
   return isProcessing || updatePending || migratePending;
 };
 
-// Hook de debounce corregido
-function useDebounce<T extends (...args: any[]) => any>(
-  callback: T,
+// Hook de debounce tipado por argumentos y retorno
+function useDebounce<Args extends unknown[], R>(
+  callback: (...args: Args) => R,
   delay: number
-): T {
+): (...args: Args) => void {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Necesitamos que useCallback tenga la dependencia correcta siempre
   return useCallback(
-    ((...args: Parameters<T>) => {
+    (...args: Args) => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => callback(...args), delay);
-    }) as T,
+    },
     [callback, delay]
   );
 }
@@ -120,6 +120,7 @@ const LoadingSpinner = ({
     md: "h-6 w-6",
     lg: "h-8 w-8",
   };
+
   return (
     <svg
       className={`animate-spin ${sizeClasses[size]} ${className}`}
@@ -170,8 +171,7 @@ const StatusUpdateIndicator = ({
   );
 };
 
-function OrderDetail({ orderId }: { orderId: string }) {
-  const { data, isLoading, error } = useAdminOrder(orderId);
+function OrderDetail({ order }: { order: AdminOrderDetail }) {
   const updateStatusMutation = useUpdateOrderStatus();
   const migrateOrderMutation = useMigrateOrder();
   const queryClient = useQueryClient();
@@ -191,7 +191,32 @@ function OrderDetail({ orderId }: { orderId: string }) {
     label: string;
   } | null>(null);
 
-  const order = data?.data;
+  const tabs = [
+    { id: "overview", label: "Resumen", icon: EyeIcon },
+    { id: "items", label: "Productos", icon: ShoppingBagIcon },
+    { id: "timeline", label: "Timeline", icon: ClockIcon },
+    { id: "notes", label: "Notas", icon: DocumentDuplicateIcon },
+  ] as const;
+
+  const orderExtras = order as AdminOrderDetail & { entrega?: unknown };
+  type EntregaInfo = { id: string; repartidor_id: string; estado: string };
+  const entrega =
+    orderExtras.entrega &&
+    typeof orderExtras.entrega === "object" &&
+    "id" in orderExtras.entrega &&
+    "repartidor_id" in orderExtras.entrega &&
+    "estado" in orderExtras.entrega
+      ? (orderExtras.entrega as EntregaInfo)
+      : undefined;
+
+  const orderForConditions = {
+    id: order.id,
+    estado: order.estado,
+    ...(order.tercero_id !== undefined ? { tercero_id: order.tercero_id } : {}),
+    ...(order.tns_kardex_id !== undefined ? { tns_kardex_id: order.tns_kardex_id } : {}),
+    ...(order.montado_carro !== undefined ? { montado_carro: order.montado_carro } : {}),
+    ...(entrega ? { entrega } : {}),
+  };
 
   // Solucionar: verificaciones de hooks y derives
   const orderStats = useMemo(() => {
@@ -315,35 +340,6 @@ function OrderDetail({ orderId }: { orderId: string }) {
     }));
   }, [order]);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-        <div className="h-64 bg-gray-200 rounded"></div>
-        <div className="h-64 bg-gray-200 rounded"></div>
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-800">Error al cargar el pedido</p>
-      </div>
-    );
-  }
-  if (!order) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-600 mb-4">
-            No encontrado
-          </h2>
-          <p className="text-gray-800">El pedido no existe</p>
-        </div>
-      </div>
-    );
-  }
-
   // Función utilidad
   // const copyToClipboard = async (text: string, label: string) => {
   //   try {
@@ -369,10 +365,10 @@ function OrderDetail({ orderId }: { orderId: string }) {
         fecha_creacion: order.fechaCreacion,
         estado: order.estado,
         metodo_pago: order.metodoPago,
-        items: order.items.map((item: any) => ({
+        items: order.items.map((item: OrderItem) => ({
           producto_nombre: item.productName || "Producto sin nombre",
-          cantidad: item.quantity || item.cantidad || 0,
-          precio_unitario: item.unitPrice || item.precioUnitario || 0,
+          cantidad: item.cantidad ?? 0,
+          precio_unitario: item.precioUnitario ?? 0,
           subtotal: item.subtotal || 0,
           sku: item.productSku || "",
         })),
@@ -461,8 +457,12 @@ function OrderDetail({ orderId }: { orderId: string }) {
       setNotes("");
 
       if (result?.data?.terceroSincronizado) {
-        const orderData = result.data as any;
-        console.log("📊 Sincronización exitosa:", {
+        const orderData = result.data as {
+          terceroId?: number;
+          terceroNombre?: string;
+          terceroExistia?: boolean;
+        };
+        console.warn("📊 Sincronización exitosa:", {
           terceroId: orderData.terceroId,
           terceroNombre: orderData.terceroNombre,
           pedidoId: order.id,
@@ -471,9 +471,9 @@ function OrderDetail({ orderId }: { orderId: string }) {
             : "Tercero creado en TNS",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       // El onError del hook ya maneja el toast.
-      const statusCode = error?.response?.status;
+      const statusCode = (error as { response?: { status?: number } })?.response?.status;
       if (statusCode === 503) {
         // Mantener el modal abierto para reintentar.
       } else {
@@ -514,8 +514,12 @@ function OrderDetail({ orderId }: { orderId: string }) {
           notas: `Estado cambiado a ${statusLabels[newStatus]}`,
         });
         if (result?.data?.terceroSincronizado) {
-          const orderData = result.data as any;
-          console.log("📊 Información de sincronización:", {
+          const orderData = result.data as {
+            terceroId?: number;
+            terceroNombre?: string;
+            terceroExistia?: boolean;
+          };
+          console.warn("📊 Información de sincronización:", {
             terceroId: orderData.terceroId,
             terceroNombre: orderData.terceroNombre,
             pedidoId: order.id,
@@ -524,7 +528,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
               : "Creado nuevo en TNS",
           });
         }
-      } catch (error: any) {
+      } catch {
         // El onError del hook ya maneja el toast
       } finally {
         setIsProcessing(false);
@@ -551,7 +555,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
         duration: 4000,
         position: "top-right",
       });
-    } catch (error: any) {
+    } catch {
       toast.error(
         "❌ Error al migrar tercero. Verifique la conexión con ApiTercero.",
         {
@@ -584,7 +588,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
             newStatus: "en_proceso",
             notas: "Pedido migrado a TNS",
           });
-        } catch (statusError: any) {
+        } catch {
           toast.error(
             "⚠️ Pedido migrado, pero no se pudo actualizar el estado a En Proceso.",
             {
@@ -598,7 +602,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
         duration: 4000,
         position: "top-right",
       });
-    } catch (error: any) {
+    } catch {
       toast.error(
         "❌ Error al migrar a TNS. Verifique la conexión con ApiPedidoVenta.",
         {
@@ -609,7 +613,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
     } finally {
       setIsProcessing(false);
     }
-  }, [order.id, order.estado, isProcessing, migrateOrderMutation, updateStatusMutation]);
+  }, [order.id, order.estado, order.usuario?.email, isProcessing, migrateOrderMutation, updateStatusMutation]);
 
   const handleSequentialAction = useCallback(
     async (
@@ -985,17 +989,12 @@ function OrderDetail({ orderId }: { orderId: string }) {
         
         <div className="mt-6 pt-6 border-t border-gray-200">
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-            {[
-              { id: "overview", label: "Resumen", icon: EyeIcon },
-              { id: "items", label: "Productos", icon: ShoppingBagIcon },
-              { id: "timeline", label: "Timeline", icon: ClockIcon },
-              { id: "notes", label: "Notas", icon: DocumentDuplicateIcon },
-            ].map((tab) => {
+            {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? "bg-white text-blue-600 shadow-sm"
@@ -1023,7 +1022,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
           <div className="space-y-6">
             {/* Info sincronización */}
             {order.estado === "confirmada" &&
-              (order as any).terceroSincronizado && (
+              order.terceroSincronizado && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0">
@@ -1036,17 +1035,17 @@ function OrderDetail({ orderId }: { orderId: string }) {
                         ✅ Cliente Sincronizado con Sistema Externo
                       </h3>
                       <div className="space-y-1">
-                        {(order as any).terceroNombre && (
+                        {order.terceroNombre && (
                           <p className="text-sm text-blue-800">
                             <span className="font-semibold">Tercero:</span>{" "}
-                            {(order as any).terceroNombre}
+                            {order.terceroNombre}
                           </p>
                         )}
-                        {(order as any).terceroId && (
+                        {order.terceroId && (
                           <p className="text-xs text-blue-700">
                             ID del Tercero:{" "}
                             <code className="bg-blue-100 px-2 py-0.5 rounded">
-                              {(order as any).terceroId}
+                              {order.terceroId}
                             </code>
                           </p>
                         )}
@@ -1059,14 +1058,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
               <OrderMigrationStatus orderId={order.id} />
               {(order.estado === "confirmada" || order.estado === "en_proceso") && (
                 <OrderProcessConditions
-                  order={{
-                    id: order.id,
-                    estado: order.estado,
-                    tercero_id: (order as any).tercero_id,
-                    tns_kardex_id: (order as any).tns_kardex_id,
-                    montado_carro: (order as any).montado_carro,
-                    entrega: (order as any).entrega,
-                  }}
+                  order={orderForConditions}
                   onUpdate={() => {
                     // Refrescar datos del pedido
                     queryClient.invalidateQueries({ queryKey: ["admin-order", order.id] });
@@ -1091,20 +1083,20 @@ function OrderDetail({ orderId }: { orderId: string }) {
                     <span className="font-medium text-gray-700">Email:</span>{" "}
                     {order.usuario?.email || "N/A"}
                   </p>
-                  {(order.usuario as any)?.tipoIdentificacion && (
+                  {order.usuario?.tipoIdentificacion && (
                     <p className="text-sm">
                       <span className="font-medium text-gray-700">
                         Tipo de Identificación:
                       </span>{" "}
-                      {(order.usuario as any).tipoIdentificacion}
+                      {order.usuario.tipoIdentificacion}
                     </p>
                   )}
-                  {(order.usuario as any)?.numeroIdentificacion && (
+                  {order.usuario?.numeroIdentificacion && (
                     <p className="text-sm">
                       <span className="font-medium text-gray-700">
                         Número de Identificación:
                       </span>{" "}
-                      {(order.usuario as any).numeroIdentificacion}
+                      {order.usuario.numeroIdentificacion}
                     </p>
                   )}
                 </div>
@@ -1179,10 +1171,10 @@ function OrderDetail({ orderId }: { orderId: string }) {
                         {order.direccionEnvio.codigoPostal}
                       </p>
                     )}
-                    {(order.direccionEnvio as any).pais && (
+                    {order.direccionEnvio.pais && (
                       <p>
                         <span className="font-medium text-gray-700">País:</span>{" "}
-                        {(order.direccionEnvio as any).pais}
+                        {order.direccionEnvio.pais}
                       </p>
                     )}
                   </div>
@@ -1836,5 +1828,5 @@ export default function OrderDetailWrapper({ orderId }: { orderId: string }) {
     );
   }
 
-  return <OrderDetail orderId={orderId} />;
+  return <OrderDetail order={data.data} />;
 }

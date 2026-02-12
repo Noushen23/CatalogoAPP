@@ -44,14 +44,12 @@ const paymentMethodLabels: Record<PaymentMethod, string> = {
   bancolombia_transfer: 'Bancolombia',
 };
 
-const ORDER_SORTABLE_FIELDS = [
-  'numero_orden',
-  'usuario_id',
-  'estado',
-  'total',
-  'fecha_creacion',
-] as const;
-type OrderSortField = typeof ORDER_SORTABLE_FIELDS[number];
+type OrderSortField =
+  | 'numero_orden'
+  | 'usuario_id'
+  | 'estado'
+  | 'total'
+  | 'fecha_creacion';
 
 export default function OrdersTable() {
   const [showFilters, setShowFilters] = useState(false);
@@ -59,6 +57,10 @@ export default function OrdersTable() {
   const [sortField, setSortField] = useState<OrderSortField>('fecha_creacion');
   const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+
+  const skeletonItems = Array.from({ length: 10 }, (_, idx) => ({
+    id: `skeleton-${idx}`,
+  }))
   
 
 
@@ -106,7 +108,7 @@ export default function OrdersTable() {
   //   toast.success('Imprimiendo pedidos...');
   // };
 
-  const handleFilterChange = (key: keyof OrderFilters, value: any) => {
+  const handleFilterChange = (key: keyof OrderFilters, value: OrderFilters[keyof OrderFilters]) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value || undefined,
@@ -372,8 +374,8 @@ export default function OrdersTable() {
         {isLoading ? (
           <div className="p-6">
             <div className="animate-pulse space-y-4">
-              {[...Array(10)].map((_, i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded"></div>
+              {skeletonItems.map((item) => (
+                <div key={item.id} className="h-16 bg-gray-200 rounded"></div>
               ))}
             </div>
           </div>

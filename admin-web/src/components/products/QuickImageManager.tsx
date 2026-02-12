@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
+import Image from 'next/image'
 import { useQueryClient } from '@tanstack/react-query'
 import { AdminProductsService } from '@/lib/admin-products'
 import { ProductImage } from '@/types'
@@ -59,9 +60,10 @@ export function QuickImageManager({
       queryClient.invalidateQueries({ queryKey: ['admin-products'] })
       queryClient.invalidateQueries({ queryKey: ['admin-product', productId] })
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error al subir imágenes:', error)
-      setError(error.message || 'Error al subir las imágenes')
+      const errorMessage = error instanceof Error ? error.message : 'Error al subir las imágenes'
+      setError(errorMessage)
     } finally {
       setUploadingImages(false)
     }
@@ -109,14 +111,16 @@ export function QuickImageManager({
       queryClient.invalidateQueries({ queryKey: ['admin-products'] })
       queryClient.invalidateQueries({ queryKey: ['admin-product', productId] })
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error al eliminar imagen:', error)
+      const response = (error as { response?: { data?: unknown; status?: number } })?.response
+      const errorMessage = error instanceof Error ? error.message : 'Error al eliminar la imagen'
       console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
+        message: errorMessage,
+        response: response?.data,
+        status: response?.status
       })
-      setError(error.message || 'Error al eliminar la imagen')
+      setError(errorMessage)
     }
   }
 
@@ -131,9 +135,10 @@ export function QuickImageManager({
       
       onImagesChange?.(updatedImages)
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error al actualizar imagen principal:', error)
-      setError(error.message || 'Error al actualizar imagen principal')
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar imagen principal'
+      setError(errorMessage)
     }
   }
 
@@ -165,10 +170,14 @@ export function QuickImageManager({
             
             return (
               <div key={image.id} className="relative">
-                <img
+                <Image
                   src={image.url}
                   alt={image.alt_text || `Imagen ${index + 1}`}
+                  width={32}
+                  height={32}
+                  sizes="32px"
                   className="h-8 w-8 rounded-full object-cover border-2 border-white"
+                  unoptimized
                   onError={(e) => {
                     console.error('Error cargando imagen:', image.url)
                     e.currentTarget.style.display = 'none'
@@ -228,10 +237,14 @@ export function QuickImageManager({
               
               return (
                 <div key={image.id} className="relative group">
-                  <img
+                  <Image
                     src={image.url}
                     alt={image.alt_text || `Imagen ${index + 1}`}
+                    width={64}
+                    height={64}
+                    sizes="64px"
                     className="h-16 w-16 object-cover rounded border"
+                    unoptimized
                     onError={(e) => {
                       console.error('Error cargando imagen:', image.url)
                       e.currentTarget.style.display = 'none'
@@ -331,10 +344,14 @@ export function QuickImageManager({
             
             return (
               <div key={image.id} className="relative group">
-                <img
+                <Image
                   src={image.url}
                   alt={image.alt_text || `Imagen ${index + 1}`}
+                  width={240}
+                  height={80}
+                  sizes="(max-width: 640px) 33vw, 160px"
                   className="w-full h-20 object-cover rounded border"
+                  unoptimized
                   onError={(e) => {
                     console.error('Error cargando imagen:', image.url)
                     e.currentTarget.style.display = 'none'

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { DeliveryService, PedidoAsignadoAdmin } from '@/lib/delivery';
+import { DeliveryService } from '@/lib/delivery';
 
 interface FiltrosPedidosAsignados {
   estado?: string;
@@ -27,11 +27,12 @@ export function usePedidosAsignados(filtros?: FiltrosPedidosAsignados) {
           };
         }
         return result;
-      } catch (error: any) {
+      } catch (error) {
         console.error('❌ Error en usePedidosAsignados:', error);
-        if (error.response) {
-          console.error('Response data:', error.response.data);
-          console.error('Response status:', error.response.status);
+        const response = (error as { response?: { data?: unknown; status?: number } })?.response
+        if (response) {
+          console.error('Response data:', response.data);
+          console.error('Response status:', response.status);
         }
         // Retornar valores por defecto en caso de error
         throw error; // Re-lanzar para que React Query maneje el error

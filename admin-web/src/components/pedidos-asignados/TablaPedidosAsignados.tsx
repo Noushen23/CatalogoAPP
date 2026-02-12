@@ -4,10 +4,21 @@ import clsx from 'clsx';
 import { Loader2, MapPin, Package, Clock, User, Truck, CheckCircle } from 'lucide-react';
 import { PedidoAsignadoAdmin } from '@/lib/delivery';
 
+type PedidoAsignadoAdminExtended = PedidoAsignadoAdmin & {
+  itemsTotal?: number;
+  origen?: string;
+  canal?: string;
+  fuente?: string;
+  canal_origen?: string;
+  actualizado_por?: string;
+  actualizado_por_nombre?: string;
+  ultima_actualizacion_usuario?: string;
+};
+
 interface TablaPedidosAsignadosProps {
-  pedidos: PedidoAsignadoAdmin[];
+  pedidos: PedidoAsignadoAdminExtended[];
   estaCargando?: boolean;
-  onSeleccionarPedido?: (pedido: PedidoAsignadoAdmin) => void;
+  onSeleccionarPedido?: (pedido: PedidoAsignadoAdminExtended) => void;
   pedidoSeleccionadoId?: string | null;
 }
 
@@ -118,20 +129,20 @@ export function TablaPedidosAsignados({
               : null;
             // Usar una combinación única: id del pedido + entrega_id + index para garantizar unicidad
             const rowKey = `${pedido.id}-${pedido.entrega_id || 'no-entrega'}-${index}`;
-            const itemsCount = pedido.items_count ?? (pedido as any).itemsTotal ?? 0;
+            const itemsCount = pedido.items_count ?? pedido.itemsTotal ?? 0;
             const origenPedido =
-              (pedido as any).origen ||
-              (pedido as any).canal ||
-              (pedido as any).fuente ||
-              (pedido as any).canal_origen ||
+              pedido.origen ||
+              pedido.canal ||
+              pedido.fuente ||
+              pedido.canal_origen ||
               null;
             const origenLabel = origenPedido
               ? String(origenPedido).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
               : null;
             const ultimoActualizador =
-              (pedido as any).actualizado_por ||
-              (pedido as any).actualizado_por_nombre ||
-              (pedido as any).ultima_actualizacion_usuario ||
+              pedido.actualizado_por ||
+              pedido.actualizado_por_nombre ||
+              pedido.ultima_actualizacion_usuario ||
               null;
             const fechaActualizacion = pedido.fecha_actualizacion
               ? new Date(pedido.fecha_actualizacion).toLocaleString('es-CO', {

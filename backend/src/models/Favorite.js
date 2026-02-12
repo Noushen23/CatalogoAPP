@@ -1,6 +1,7 @@
 const { query, transaction } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config/env');
+const { getRequestBaseUrl } = require('../helpers/requestContext');
 
 class Favorite {
   constructor(data) {
@@ -315,7 +316,11 @@ class Favorite {
     }
     
     // Construir URL completa usando la configuración
-    const baseUrl = config.apiBaseUrl || 'http://192.168.3.104:3001';
+    const baseUrl =
+      getRequestBaseUrl() ||
+      config.apiBaseUrl ||
+      config.app?.url ||
+      'http://181.49.225.69:3001';
     return imagePath.startsWith('/') 
       ? `${baseUrl}${imagePath}`
       : `${baseUrl}/${imagePath}`;

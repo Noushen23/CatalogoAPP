@@ -17,6 +17,31 @@ export interface AdminUser {
   ultimoAcceso?: string
 }
 
+interface BackendUser {
+  id?: string
+  email?: string
+  nombre_completo?: string
+  nombreCompleto?: string
+  telefono?: string
+  direccion?: string
+  tipo_identificacion?: string
+  tipoIdentificacion?: string
+  numero_identificacion?: string
+  numeroIdentificacion?: string
+  rol?: string
+  email_verificado?: boolean
+  emailVerificado?: boolean
+  activo?: boolean
+  fecha_creacion?: string
+  fechaCreacion?: string
+  createdAt?: string
+  fecha_actualizacion?: string
+  fechaActualizacion?: string
+  updatedAt?: string
+  ultimo_acceso?: string
+  ultimoAcceso?: string
+}
+
 export interface PaginatedResponse<T> {
   data: T[]
   pagination: {
@@ -50,16 +75,16 @@ export const AdminUsersService = {
         Object.entries(filters || {}).filter(([_, value]) => value !== undefined && value !== '')
       )
       
-      console.log('📡 AdminUsersService - Llamando API con filters:', cleanParams)
+      console.warn('📡 AdminUsersService - Llamando API con filters:', cleanParams)
       const response = await api.get('/admin/users', { params: cleanParams })
-      console.log('📡 AdminUsersService - Respuesta recibida:', response.data)
+      console.warn('📡 AdminUsersService - Respuesta recibida:', response.data)
       
       // El backend devuelve: { success: true, data: { users: [...], pagination: {...} } }
       if (response.data?.success && response.data.data?.users) {
         const users = response.data.data.users
         const pagination = response.data.data.pagination
         
-        const mappedUsers = users.map((u: any) => ({
+        const mappedUsers = users.map((u: BackendUser) => ({
           id: u.id,
           email: u.email,
           nombreCompleto: u.nombre_completo || u.nombreCompleto || '',
@@ -88,7 +113,7 @@ export const AdminUsersService = {
         }
       }
       
-      console.log('❌ AdminUsersService: Formato de respuesta inesperado')
+      console.warn('❌ AdminUsersService: Formato de respuesta inesperado')
       return {
         data: [],
         pagination: {
@@ -151,7 +176,7 @@ export const AdminUsersService = {
         throw new Error('ID de usuario inválido')
       }
       
-      const backendData: any = {}
+      const backendData: Record<string, string | boolean | undefined> = {}
       if (data.nombreCompleto !== undefined) backendData.nombre_completo = data.nombreCompleto
       if (data.telefono !== undefined) backendData.telefono = data.telefono
       if (data.direccion !== undefined) backendData.direccion = data.direccion
@@ -163,12 +188,12 @@ export const AdminUsersService = {
       const response = await api.put(`/admin/users/${id}`, backendData)
       
       return response.data
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error updating user:', error)
-      
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message)
-      } else if (error.message) {
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (responseMessage) {
+        throw new Error(responseMessage)
+      } else if (error instanceof Error && error.message) {
         throw new Error(error.message)
       } else {
         throw new Error('Error desconocido al actualizar el usuario')

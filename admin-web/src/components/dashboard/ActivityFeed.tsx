@@ -56,9 +56,9 @@ export default function ActivityFeed() {
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h3>
       <div className="space-y-3">
-        {activities.map((activity, index) => (
+        {activities.map((activity) => (
           <div
-            key={index}
+            key={activity.title}
             className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-3 flex-1">

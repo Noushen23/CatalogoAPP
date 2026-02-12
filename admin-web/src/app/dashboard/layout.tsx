@@ -26,7 +26,7 @@ export default function DashboardLayout({
           // Permitir acceso a admin, moderator y repartidor
           const allowedRoles: string[] = ['admin', 'moderator', 'repartidor']
           if (allowedRoles.includes(result.user.roles)) {
-            console.log('✅ Dashboard Layout: Usuario autenticado correctamente')
+            console.warn('✅ Dashboard Layout: Usuario autenticado correctamente')
             setUser(result.user)
           } else {
             console.error('❌ Dashboard Layout: Rol no permitido:', result.user.roles)
@@ -34,7 +34,7 @@ export default function DashboardLayout({
             authService.logout()
           }
         } else {
-          console.log('⚠️ Dashboard Layout: No hay usuario autenticado, redirigiendo al login')
+          console.warn('⚠️ Dashboard Layout: No hay usuario autenticado, redirigiendo al login')
           router.push('/')
         }
       } catch (error) {

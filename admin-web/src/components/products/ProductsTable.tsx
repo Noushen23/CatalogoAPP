@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AdminProductsService, AdminProduct } from '@/lib/admin-products'
+import { AdminProductsService, AdminProduct, PaginatedResponse } from '@/lib/admin-products'
 import { RefreshIcon, PlusIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon } from '@/components/icons'
 import { EyeIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
@@ -63,14 +63,14 @@ export function ProductsTable({ filters }: ProductsTableProps) {
         const backendSortBy = sortMap[sortBy] || 'recientes'
         
         // Preparar filtros para el backend
-        const backendFilters: any = {
+        const backendFilters: Record<string, string | number | boolean | undefined> = {
           search: debouncedSearchTerm || undefined,
           page: currentPage,
           limit: itemsPerPage,
           sortBy: backendSortBy
         }
         
-        console.log(' ProductsTable - Enviando filtros:', backendFilters)
+        console.warn('ProductsTable - Enviando filtros:', backendFilters)
         
         // Mapear filtros: category -> categoriaId
         if (filters?.category && filters.category !== 'all') {
@@ -159,13 +159,17 @@ export function ProductsTable({ filters }: ProductsTableProps) {
     setCurrentPage(1) // Reset a la primera página
   }
 
+  const skeletonItems = Array.from({ length: 5 }, (_, idx) => ({
+    id: `skeleton-${idx}`,
+  }))
+
   if (isLoading) {
     return (
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:p-6">
           <div className="animate-pulse space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            {skeletonItems.map((item) => (
+              <div key={item.id} className="h-16 bg-gray-200 rounded"></div>
             ))}
           </div>
         </div>
@@ -269,11 +273,14 @@ export function ProductsTable({ filters }: ProductsTableProps) {
                         images={product.images || []}
                         compact={true}
                         onImagesChange={(images) => {
-                          queryClient.setQueryData(['admin-products'], (oldData: any) => {
+                          queryClient.setQueryData<PaginatedResponse<AdminProduct>>(['admin-products'], (oldData) => {
                             if (!oldData) return oldData
-                            return oldData.map((p: AdminProduct) => 
-                              p.id === product.id ? { ...p, images } : p
-                            )
+                            return {
+                              ...oldData,
+                              data: oldData.data.map((p) =>
+                                p.id === product.id ? { ...p, images } : p
+                              ),
+                            }
                           })
                         }}
                       />
@@ -402,7 +409,7 @@ export function ProductsTable({ filters }: ProductsTableProps) {
             
             <div className="px-6 py-4">
               <p className="text-sm text-gray-500">
-                ¿Estás seguro de que quieres eliminar el producto <strong>"{deleteProduct.title}"</strong>?
+                ¿Estás seguro de que quieres eliminar el producto <strong>&quot;{deleteProduct.title}&quot;</strong>?
               </p>
               <p className="text-sm text-gray-500 mt-2">
                 Esta acción no se puede deshacer.

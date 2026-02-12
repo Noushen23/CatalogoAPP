@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminProductsService, AdminProduct } from '@/lib/admin-products'
-import { AdminCategoriesService } from '@/lib/admin-categories'
+import { AdminCategoriesService, AdminCategory } from '@/lib/admin-categories'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CreateProductRequest, ProductImage } from '@/types'
 import { ImageManager } from './ImageManager'
-import { getImageUrl } from '@/lib/config'
 
 interface ProductFormProps {
   product?: AdminProduct
@@ -54,9 +53,6 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
       setFormData(newFormData)
     }
   }, [product])
-  const [uploadingImages, setUploadingImages] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   // Consulta de categorías
   const { data: categories } = useQuery({
     queryKey: ['admin-categories'],
@@ -92,100 +88,6 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
       ...prev,
       tags
     }))
-  }
-
-  // Funciones para manejar imágenes
-  const handleImageUpload = async (files: FileList) => {
-    setUploadingImages(true)
-    try {
-      if (product) {
-        // Si estamos editando un producto, subir las imágenes directamente al servidor
-        const formData = new FormData()
-        Array.from(files).forEach(file => {
-          formData.append('images', file)
-        })
-        
-        const response = await AdminProductsService.uploadProductImages(product.id, files)
-        
-        // Actualizar el estado con las nuevas URLs de imagen
-        const newImageUrls = response.data || []
-        // Construir URLs completas usando configuración centralizada
-        const fullImageUrls = newImageUrls.map((url: string) => getImageUrl(url))
-        
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, ...fullImageUrls.map((url: string, index: number) => ({
-            id: `upload-${Date.now()}-${index}`,
-            url,
-            orden: prev.images.length + index,
-            alt_text: ''
-          }))]
-        }))
-        
-        // Mostrar mensaje de éxito
-        
-        // Refrescar la lista de productos para mostrar los cambios
-        queryClient.invalidateQueries({ queryKey: ['admin-products'] })
-        queryClient.invalidateQueries({ queryKey: ['admin-product', product.id] })
-        
-      } else {
-        // Si estamos creando un nuevo producto, convertir a base64
-        const imagePromises = Array.from(files).map(async (file) => {
-          return new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onload = (e) => {
-              resolve(e.target?.result as string)
-            }
-            reader.readAsDataURL(file)
-          })
-        })
-
-        const newImages = await Promise.all(imagePromises)
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, ...newImages.map((url, index) => ({
-            id: `base64-${Date.now()}-${index}`,
-            url,
-            orden: prev.images.length + index,
-            alt_text: ''
-          }))]
-        }))
-      }
-    } catch (error) {
-      console.error('Error uploading images:', error)
-      setError('Error al subir las imágenes')
-    } finally {
-      setUploadingImages(false)
-    }
-  }
-
-  const removeImage = async (_imageId: string, index: number) => {
-    try {
-      if (product) {
-        // Si estamos editando un producto, eliminar la imagen del servidor usando el índice
-        await AdminProductsService.deleteProductImage(product.id, index.toString())
-        
-        // Refrescar la lista de productos para mostrar los cambios
-        queryClient.invalidateQueries({ queryKey: ['admin-products'] })
-        queryClient.invalidateQueries({ queryKey: ['admin-product', product.id] })
-      }
-      
-      // Actualizar el estado local (tanto para edición como creación)
-      setFormData(prev => ({
-        ...prev,
-        images: prev.images.filter((_, i) => i !== index)
-      }))
-    } catch (error) {
-      console.error('Error removing image:', error)
-      setError('Error al eliminar la imagen')
-    }
-  }
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      handleImageUpload(files)
-    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -251,17 +153,17 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
       } else {
         router.push('/dashboard/products')
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error al guardar producto:', error)
       
       // Manejo de errores más detallado
       let errorMessage = 'Error al guardar el producto'
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error
-      } else if (error.message) {
+      const responseData = (error as { response?: { data?: { message?: string; error?: string } } })?.response?.data
+      if (responseData?.message) {
+        errorMessage = responseData.message
+      } else if (responseData?.error) {
+        errorMessage = responseData.error
+      } else if (error instanceof Error && error.message) {
         errorMessage = error.message
       }
       
@@ -375,7 +277,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="">Seleccionar categoría</option>
-              {categories?.data?.map((category: any) => (
+              {categories?.data?.map((category: AdminCategory) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>

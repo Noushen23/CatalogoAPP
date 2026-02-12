@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { useQueryClient } from '@tanstack/react-query'
 import { AdminProductsService } from '@/lib/admin-products'
 import { ProductImage } from '@/types'
@@ -52,7 +53,7 @@ export function ImageManager({
   }, [images])
 
   // Validar archivos de imagen
-  const validateImageFiles = (files: FileList): string[] => {
+  const validateImageFiles = useCallback((files: FileList): string[] => {
     const errors: string[] = []
     const maxSize = 5 * 1024 * 1024 // 5MB
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -71,7 +72,7 @@ export function ImageManager({
     }
     
     return errors
-  }
+  }, [images.length, maxImages])
 
   // Subir nuevas imágenes
   const handleImageUpload = useCallback(async (files: FileList) => {
@@ -93,11 +94,10 @@ export function ImageManager({
       const newImages: ProductImage[] = (response.data || []).map((url: string, index: number) => ({
         id: `upload-${Date.now()}-${index}`,
         url: getImageUrl(url),
-          orden: images.length + index,
-          alt_text: '',
-          esPrincipal: false
-        }
-      })
+        orden: images.length + index,
+        alt_text: '',
+        esPrincipal: false
+      }))
 
       const updatedImages = [...images, ...newImages]
       onImagesChange?.(updatedImages)
@@ -106,12 +106,13 @@ export function ImageManager({
       queryClient.invalidateQueries({ queryKey: ['admin-products'] })
       queryClient.invalidateQueries({ queryKey: ['admin-product', productId] })
       
-    } catch (error: any) {
-      setError(error.message || 'Error al subir las imágenes')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al subir las imágenes'
+      setError(errorMessage)
     } finally {
       setUploadingImages(false)
     }
-  }, [productId, images, onImagesChange, queryClient])
+  }, [productId, images, onImagesChange, queryClient, validateImageFiles])
 
   // Eliminar imagen
   const handleDeleteImage = useCallback(async (imageId: string, imageIndex: number) => {
@@ -156,8 +157,9 @@ export function ImageManager({
       queryClient.invalidateQueries({ queryKey: ['admin-products'] })
       queryClient.invalidateQueries({ queryKey: ['admin-product', productId] })
       
-    } catch (error: any) {
-      setError(error.message || 'Error al eliminar la imagen')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al eliminar la imagen'
+      setError(errorMessage)
     }
   }, [productId, images, onImagesChange, queryClient])
 
@@ -173,8 +175,9 @@ export function ImageManager({
       onImagesChange?.(updatedImages)
       
       // Aquí podrías hacer una llamada al backend para actualizar la imagen principal
-    } catch (error: any) {
-      setError(error.message || 'Error al actualizar imagen principal')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar imagen principal'
+      setError(errorMessage)
     }
   }, [images, onImagesChange])
 
@@ -314,16 +317,20 @@ export function ImageManager({
                  } ${image.esPrincipal ? 'ring-2 ring-yellow-400' : ''}`}
                >
                  {/* Imagen */}
-                 <img
-                   src={image.url}
-                   alt={image.alt_text || `Imagen ${index + 1}`}
-                   className="w-full h-32 object-cover"
-                   onError={(e) => {
-                     console.error('Error cargando imagen:', image.url)
-                     // Ocultar la imagen si falla al cargar
-                     e.currentTarget.style.display = 'none'
-                   }}
-                 />
+                <Image
+                  src={image.url}
+                  alt={image.alt_text || `Imagen ${index + 1}`}
+                  width={320}
+                  height={128}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
+                  className="w-full h-32 object-cover"
+                  unoptimized
+                  onError={(e) => {
+                    console.error('Error cargando imagen:', image.url)
+                    // Ocultar la imagen si falla al cargar
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
 
                  {/* Overlay con controles */}
                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">

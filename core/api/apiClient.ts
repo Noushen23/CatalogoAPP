@@ -34,6 +34,7 @@ export interface PaginationData {
 class ApiClient {
   private client: AxiosInstance;
   private token: string | null = null;
+  private baseUrlResolved = false;
 
   constructor() {
     this.client = axios.create({
@@ -50,6 +51,12 @@ class ApiClient {
     // Interceptor de request para agregar token
     this.client.interceptors.request.use(
       async (config) => {
+        if (!this.baseUrlResolved) {
+          const resolvedUrl = await API_CONFIG.getResolvedApiUrl();
+          this.client.defaults.baseURL = resolvedUrl;
+          config.baseURL = resolvedUrl;
+          this.baseUrlResolved = true;
+        }
 
 	console.log('API Request:',{
 	method: config.method?.toUpperCase(),

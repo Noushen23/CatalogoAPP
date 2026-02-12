@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AdminCategoriesService } from '@/lib/admin-categories'
+import { AdminCategoriesService, AdminCategory } from '@/lib/admin-categories'
 import { useQuery } from '@tanstack/react-query'
 
 interface ProductFiltersProps {
@@ -50,7 +50,7 @@ export function ProductFilters({ onFiltersChange }: ProductFiltersProps) {
             onChange={e => handleFilterChange('category', e.target.value)}
           >
             <option value="all">Todas las categorías</option>
-            {categories.map((cat: any) => (
+            {categories.map((cat: AdminCategory) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
               </option>

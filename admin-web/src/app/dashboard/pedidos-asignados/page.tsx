@@ -4,7 +4,7 @@ import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react'
 import { usePedidosAsignados } from '@/hooks/usePedidosAsignados';
 import { TablaPedidosAsignados } from '@/components/pedidos-asignados/TablaPedidosAsignados';
 import { FiltrosPedidosAsignados } from '@/components/pedidos-asignados/FiltrosPedidosAsignados';
-import { Truck, RefreshCw, Route, Plus } from 'lucide-react';
+import { Truck, RefreshCw, Plus } from 'lucide-react';
 import { CrearRutaModal } from '@/components/pedidos-asignados/CrearRutaModal';
 
 const filtrosIniciales: {

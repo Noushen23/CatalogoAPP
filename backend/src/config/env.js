@@ -35,17 +35,15 @@ const config = {
       }
       
       const allowedOrigins = [
-        'http://192.168.3.104:8081', // Expo web
-        'http://192.168.3.104:8082', // Expo web alternativo
-        'http://192.168.3.104:3000', // Admin web específico
-        'http://192.168.3.104:3001', // Android emulator
-        'http://192.168.3.104:3000', // Admin web servidor remoto
-        'http://192.168.3.104:3001', // API servidor remoto
+        'http://192.168.1.120:3000', // Admin web específico
+        'http://192.168.1.120:3001', // Android emulator
+        'http://181.49.225.69:3000', // Admin web servidor remoto
+        'http://181.49.225.69:3001', // API servidor remoto
       ];
       
       // Patrones para IPs locales, públicas y servidor remoto
       const patterns = [
-        /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // Cualquier IP local 192.168.x.x con cualquier puerto
+        /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // 
         /^http:\/\/181\.49\.225\.\d+:\d+$/, // IP del servidor remoto con cualquier puerto
         /^http:\/\/10\.0\.2\.\d+:\d+$/, // Android emulator
         /^http:\/\/127\.0\.0\.1:\d+$/ // Cualquier puerto 127.0.0.1
@@ -84,7 +82,7 @@ const config = {
   app: {
     name: process.env.APP_NAME || 'Tienda Móvil',
     version: process.env.APP_VERSION || '1.0.0',
-    url: process.env.APP_URL || process.env.API_BASE_URL || 'http://192.168.3.104:3001'
+    url: process.env.APP_URL || process.env.API_BASE_URL || 'http://181.49.225.69:3001'
   },
   
   // Configuración de email (opcional)
@@ -104,21 +102,19 @@ const config = {
     path: process.env.UPLOADS_PATH || './uploads'
   },
 
-  // URL base para construir URLs de imágenes (SIEMPRE usar IP pública)
-  // FORZAR IP pública para que las imágenes sean accesibles desde cualquier lugar
+  // URL base para construir URLs de imágenes (fallback si no hay request context)
   apiBaseUrl: (() => {
-    // IP pública del servidor (siempre usar esta para imágenes)
-    const IP_PUBLICA = '192.168.3.104';
     const PUERTO = process.env.PORT || 3001;
-    const apiBaseUrl = `http://${IP_PUBLICA}:${PUERTO}`;
+    const envBaseUrl = process.env.API_BASE_URL || process.env.APP_URL;
+    const defaultBaseUrl = `http://181.49.225.69:${PUERTO}`;
+    const apiBaseUrl = envBaseUrl || defaultBaseUrl;
     
-    console.log('🔧 [Config] Configurando apiBaseUrl (FORZADO a IP pública):', {
+    console.log('🔧 [Config] Configurando apiBaseUrl (fallback):', {
       API_BASE_URL_ENV: process.env.API_BASE_URL || 'NO CONFIGURADA',
       APP_URL_ENV: process.env.APP_URL || 'NO CONFIGURADA',
-      IP_PUBLICA_FORZADA: IP_PUBLICA,
       PUERTO: PUERTO,
       valorFinal: apiBaseUrl,
-      nota: 'Las imágenes siempre usarán la IP pública para ser accesibles desde cualquier red'
+      nota: 'Se usa solo si no hay baseUrl dinámico por request'
     });
     
     return apiBaseUrl;
@@ -142,18 +138,18 @@ const config = {
       const envUrl = process.env.TERCERO_API_URL;
       const isProduction = process.env.NODE_ENV === 'production';
       
-      // En desarrollo, SIEMPRE usar 192.168.3.104 (ignorar variable de entorno si está mal configurada)
+      // En desarrollo, SIEMPRE usar  (ignorar variable de entorno si está mal configurada)
       const defaultUrl = isProduction
-        ? 'http://192.168.3.104:51252'  
-        : 'http://192.168.3.104:51252';  // IP del servidor en desarrollo
+        ? 'http://181.49.225.69:51252'  
+        : 'http://192.168.3.6:51252';  // IP del servidor en desarrollo
       
-      // En desarrollo, SIEMPRE forzar el uso de 192.168.3.104 (ignorar cualquier variable de entorno)
+      // En desarrollo, SIEMPRE forzar el uso de (ignorar cualquier variable de entorno)
       let finalUrl = defaultUrl;
       if (isProduction && envUrl) {
         // En producción, usar variable de entorno si está configurada
         finalUrl = envUrl;
       }
-      // En desarrollo, siempre usar defaultUrl (192.168.3.104) sin importar la variable de entorno
+      // En desarrollo, siempre usar defaultUrl sin importar la variable de entorno
       
       // Log de configuración
       console.log('🔧 Configuración ApiTercero:', {
@@ -161,7 +157,6 @@ const config = {
         'URL por defecto (forzada)': defaultUrl,
         'URL final utilizada': finalUrl,
         'NODE_ENV': process.env.NODE_ENV || 'development',
-        'Nota': isProduction ? 'Usando variable de entorno si está configurada' : 'FORZADO a 192.168.3.104 en desarrollo'
       });
       
       return finalUrl;
@@ -170,7 +165,7 @@ const config = {
   },
 
   apimaterial: {
-    url: process.env.APIMATERIAL_URL || 'http://192.168.3.104:51255',
+    url: process.env.APIMATERIAL_URL || 'http://192.168.3.6:51255',
     token: process.env.APIMATERIAL_TOKEN || 'angeldavidcapa2025',
     timeout: parseInt(process.env.APIMATERIAL_TIMEOUT, 10) || 10000
   },

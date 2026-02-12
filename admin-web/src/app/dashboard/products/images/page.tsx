@@ -2,13 +2,13 @@
 
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
-import { AdminProductsService, AdminProduct } from '@/lib/admin-products'
+import Image from 'next/image'
+import { AdminProductsService, AdminProduct, PaginatedResponse } from '@/lib/admin-products'
+import { ProductImage } from '@/types'
 import { ImageManager } from '@/components/products/ImageManager'
 import { ArrowLeftIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
 export default function ProductImagesPage() {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null)
@@ -21,6 +21,9 @@ export default function ProductImagesPage() {
   })
 
   const products = productsResponse?.data || []
+  const skeletonItems = Array.from({ length: 5 }, (_, idx) => ({
+    id: `skeleton-${idx}`,
+  }))
 
   const handleProductSelect = (product: AdminProduct) => {
     setSelectedProduct(product)
@@ -30,14 +33,17 @@ export default function ProductImagesPage() {
     setSelectedProduct(null)
   }
 
-  const handleImagesChange = (images: any[]) => {
+  const handleImagesChange = (images: ProductImage[]) => {
     if (selectedProduct) {
       // Actualizar el producto en el cache
-      queryClient.setQueryData(['admin-products'], (oldData: any) => {
+      queryClient.setQueryData<PaginatedResponse<AdminProduct>>(['admin-products'], (oldData) => {
         if (!oldData) return oldData
-        return oldData.map((p: AdminProduct) => 
-          p.id === selectedProduct.id ? { ...p, images } : p
-        )
+        return {
+          ...oldData,
+          data: oldData.data.map((p) =>
+            p.id === selectedProduct.id ? { ...p, images } : p
+          ),
+        }
       })
       
       // Actualizar el producto seleccionado
@@ -154,8 +160,8 @@ export default function ProductImagesPage() {
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
           <div className="px-4 py-5 sm:p-6">
             <div className="animate-pulse space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded"></div>
+              {skeletonItems.map((item) => (
+                <div key={item.id} className="h-16 bg-gray-200 rounded"></div>
               ))}
             </div>
           </div>
@@ -189,10 +195,14 @@ export default function ProductImagesPage() {
                             }
                             
                             return (
-                              <img
+                              <Image
                                 src={imageUrl}
                                 alt={product.title}
+                                width={48}
+                                height={48}
+                                sizes="48px"
                                 className="h-12 w-12 rounded-lg object-cover"
+                                unoptimized
                                 onError={(e) => {
                                   console.error('Error cargando imagen:', imageUrl)
                                   e.currentTarget.style.display = 'none'
@@ -247,11 +257,15 @@ export default function ProductImagesPage() {
                               }
                               
                               return (
-                                <img
-                                  key={index}
+                                <Image
+                                  key={imageUrl}
                                   src={imageUrl}
                                   alt={`Imagen ${index + 1}`}
+                                  width={24}
+                                  height={24}
+                                  sizes="24px"
                                   className="h-6 w-6 rounded-full object-cover border-2 border-white"
+                                  unoptimized
                                   onError={(e) => {
                                     console.error('Error cargando imagen:', imageUrl)
                                     e.currentTarget.style.display = 'none'

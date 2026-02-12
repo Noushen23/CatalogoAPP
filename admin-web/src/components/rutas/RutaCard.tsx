@@ -1,31 +1,36 @@
 'use client';
 
 import { Route, Package, User, MapPin, Calendar, Eye, Play, CheckCircle2, AlertCircle, Edit3, ArrowUp, ArrowDown, Save, X, Loader2 } from 'lucide-react';
-import { RutaPedido } from '@/lib/rutas';
+import { Ruta, RutaPedido } from '@/lib/rutas';
+
+interface SimpleMutation<TVariables = void> {
+  isPending?: boolean;
+  mutate?: (variables: TVariables) => void;
+}
 
 interface RutaCardProps {
-  ruta: any;
+  ruta: Ruta;
   rutaExpandida: string | null;
   toggleExpandirRuta: (rutaId: string) => void;
   handleIniciarRuta: (rutaId: string) => void;
-  handleAbrirFinalizar: (ruta: any) => void;
-  iniciarRutaMutation: any;
+  handleAbrirFinalizar: (ruta: Ruta) => void;
+  iniciarRutaMutation: SimpleMutation<string>;
   rutaParaFinalizar: string | null;
   pedidosEntregados: Set<string>;
   pedidosNoEntregados: Set<string>;
   togglePedidoEntregado: (pedidoId: string) => void;
   togglePedidoNoEntregado: (pedidoId: string) => void;
-  handleFinalizarRuta: (ruta: any) => void;
-  finalizarRutaMutation: any;
+  handleFinalizarRuta: (ruta: Ruta) => void;
+  finalizarRutaMutation: SimpleMutation<{ ruta_id: string; pedidos_entregados: string[]; pedidos_no_entregados: string[] }>;
   rutaEditandoOrden: string | null;
-  iniciarEdicionOrden: (ruta: any) => void;
+  iniciarEdicionOrden: (ruta: Ruta) => void;
   ordenEditado: Array<{ orden_id: string; secuencia: number }>;
   moverPedido: (index: number, direccion: 'arriba' | 'abajo') => void;
-  guardarOrden: (ruta: any) => void;
+  guardarOrden: (ruta: Ruta) => void;
   cancelarEdicion: () => void;
   cancelarFinalizar?: () => void;
-  cambiarOrdenMutation: any;
-  toggleAlternativaMutation: any;
+  cambiarOrdenMutation: SimpleMutation<{ ruta_id: string; nuevo_orden: Array<{ orden_id: string; secuencia: number }>; motivo?: string }>;
+  toggleAlternativaMutation: SimpleMutation<{ ruta_id: string; activar: boolean }>;
   getEstadoColor: (estado: string) => string;
 }
 
@@ -176,12 +181,12 @@ export function RutaCard({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleAlternativaMutation.mutate({
+                    toggleAlternativaMutation.mutate?.({
                       ruta_id: ruta.id,
-                      activar: !ruta.ruta_alternativa.activa,
+                      activar: !ruta.ruta_alternativa?.activa,
                     });
                   }}
-                  disabled={toggleAlternativaMutation.isPending}
+                  disabled={Boolean(toggleAlternativaMutation.isPending)}
                   className={`rounded px-2 py-1 text-xs font-medium transition ${
                     ruta.ruta_alternativa.activa
                       ? 'bg-gray-600 text-white hover:bg-gray-700'

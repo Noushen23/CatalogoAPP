@@ -25,7 +25,7 @@ const mobileDbConfig = {
     host: process.env.MOBILE_DB_HOST || process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.MOBILE_DB_PORT || process.env.DB_PORT || '3306', 10),
     user: process.env.MOBILE_DB_USER || process.env.DB_USER || 'root',
-    password: process.env.MOBILE_DB_PASSWORD || process.env.DB_PASSWORD || '',
+    password: process.env.MOBILE_DB_PASSWORD || process.env.DB_PASSWORD || 'Bomberos2025#',
     database: process.env.MOBILE_DB_NAME || process.env.DB_NAME || 'tiendamovil',
     charset: 'utf8mb4',
     timezone: 'Z',

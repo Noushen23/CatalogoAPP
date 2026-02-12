@@ -111,7 +111,7 @@ export const DeliveryService = {
     id: string,
     motivo: string,
     motivoDetalle?: string
-  ): Promise<{ success: boolean; reasignado: boolean; nueva_entrega_id?: string; repartidor_nuevo?: any }> {
+  ): Promise<{ success: boolean; reasignado: boolean; nueva_entrega_id?: string; repartidor_nuevo?: unknown }> {
     const response = await apiAlt.post(`/delivery/entregas/${id}/cancelar`, {
       motivo,
       motivo_detalle: motivoDetalle,
@@ -161,7 +161,7 @@ export const DeliveryService = {
     ordenId: string,
     repartidorId: string,
     motivoReasignacion?: string
-  ): Promise<{ success: boolean; entrega: Entrega; repartidor: any; reasignado?: boolean }> {
+  ): Promise<{ success: boolean; entrega: Entrega; repartidor: unknown; reasignado?: boolean }> {
     const response = await apiAlt.post('/delivery/pedidos/asignar-repartidor', {
       orden_id: ordenId,
       repartidor_id: repartidorId,
@@ -242,7 +242,7 @@ export const DeliveryService = {
     success: boolean;
     estadoActualizado: boolean;
     mensaje: string;
-    condiciones?: any;
+  condiciones?: unknown;
     razon?: string;
   }> {
     const response = await apiAlt.post('/delivery/pedidos/marcar-montado-carro', {
@@ -257,7 +257,7 @@ export const DeliveryService = {
   async verificarYActualizarEstadoEnProceso(ordenId: string): Promise<{
     actualizado: boolean;
     nuevoEstado?: string;
-    condiciones?: any;
+  condiciones?: unknown;
     razon?: string;
   }> {
     const response = await apiAlt.post('/delivery/pedidos/verificar-estado-proceso', {

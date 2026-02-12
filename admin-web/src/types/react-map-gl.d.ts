@@ -20,24 +20,24 @@ declare module 'react-map-gl/mapbox' {
     style?: React.CSSProperties;
     mapStyle?: string;
     children?: React.ReactNode;
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   export interface SourceProps {
     id: string;
     type: 'geojson' | 'vector' | 'raster' | 'image' | 'video' | 'canvas';
-    data?: any;
+    data?: unknown;
     children?: React.ReactNode;
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   export interface LayerProps {
     id?: string;
     type: string;
-    paint?: Record<string, any>;
-    layout?: Record<string, any>;
-    filter?: any[];
-    [key: string]: any;
+    paint?: Record<string, unknown>;
+    layout?: Record<string, unknown>;
+    filter?: unknown[];
+    [key: string]: unknown;
   }
 
   export interface MarkerProps {
@@ -45,7 +45,7 @@ declare module 'react-map-gl/mapbox' {
     latitude: number;
     anchor?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
     children?: React.ReactNode;
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   export const Map: React.FC<MapProps>;
