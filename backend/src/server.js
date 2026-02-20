@@ -55,16 +55,16 @@ app.use(compression());
 // Middleware de logging
 app.use(config.nodeEnv === 'development' ? morgan('dev') : morgan('combined'));
 
-// Middleware de rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
-  message: {
-    success: false,
-    message: config.rateLimit.message
-  }
-});
-app.use(limiter);
+// // Middleware de rate limiting
+// const limiter = rateLimit({
+//   windowMs: config.rateLimit.windowMs,
+//   max: config.rateLimit.max,
+//   message: {
+//     success: false,
+//     message: config.rateLimit.message
+//   }
+// });
+// app.use(limiter);
 
 // Middleware CORS global
 app.use(cors(config.cors));

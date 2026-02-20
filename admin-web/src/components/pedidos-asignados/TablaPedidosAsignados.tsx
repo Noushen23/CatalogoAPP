@@ -41,11 +41,6 @@ const estadoOrdenConfig: Record<string, { label: string; color: string }> = {
   reembolsada: { label: 'Reembolsada', color: 'bg-gray-100 text-gray-800' },
 };
 
-const prioridadConfig: Record<string, { label: string; color: string }> = {
-  alta: { label: 'Alta', color: 'bg-red-100 text-red-700 border-red-200' },
-  media: { label: 'Media', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  baja: { label: 'Baja', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-};
 
 export function TablaPedidosAsignados({
   pedidos,
@@ -85,9 +80,9 @@ export function TablaPedidosAsignados({
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
               Ítems
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-purple-600 bg-purple-50">
+            {/* <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-purple-600 bg-purple-50">
               Repartidor
-            </th>
+            </th> */}
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
               Dirección
             </th>
@@ -124,9 +119,7 @@ export function TablaPedidosAsignados({
               label: pedido.orden_estado,
               color: 'bg-gray-100 text-gray-800',
             };
-            const prioridad = pedido.prioridad
-              ? prioridadConfig[pedido.prioridad] || { label: pedido.prioridad, color: 'bg-gray-100 text-gray-700 border-gray-200' }
-              : null;
+            const prioridad = pedido.prioridad || null;
             // Usar una combinación única: id del pedido + entrega_id + index para garantizar unicidad
             const rowKey = `${pedido.id}-${pedido.entrega_id || 'no-entrega'}-${index}`;
             const itemsCount = pedido.items_count ?? pedido.itemsTotal ?? 0;
@@ -241,10 +234,7 @@ export function TablaPedidosAsignados({
                 </td>
                 <td className="px-4 py-3 text-sm">
                   {prioridad ? (
-                    <span className={clsx('inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold', prioridad.color)}>
-                      <span className="h-2.5 w-2.5 rounded-full bg-current opacity-80" />
-                      {prioridad.label}
-                    </span>
+                    <span className="text-xs font-semibold text-gray-900 capitalize">{prioridad}</span>
                   ) : (
                     <span className="text-xs text-gray-400">—</span>
                   )}

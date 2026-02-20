@@ -29,9 +29,9 @@ const mobileDbConfig = {
     database: process.env.MOBILE_DB_NAME || process.env.DB_NAME || 'tiendamovil',
     charset: 'utf8mb4',
     timezone: 'Z',
-    acquireTimeout: 60000,
-    timeout: 60000
+    connectTimeout: 60000 
 };
+
 
 /**
  * Crear conexión a la base de datos móvil

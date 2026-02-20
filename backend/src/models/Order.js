@@ -27,7 +27,8 @@ class Order {
       fechaEntregaEstimada: data.fecha_entrega_estimada,
       fechaEntregaReal: data.fecha_entrega_real,
       usuario: data.usuario || null,
-      direccionEnvio: data.direccion_envio || null,
+   // Aceptar tanto direccion_envio (snake_case) como direccionEnvio (camelCase)
+      direccionEnvio: data.direccionEnvio || data.direccion_envio || null,
       items: data.items || [],
       itemsCount: data.items_count ?? data.itemsCount ?? null,
       tercero_id: data.tercero_id || null,
@@ -101,6 +102,73 @@ class Order {
     const orderData = rows[0];
     const items = await Order.getOrderItems(orderId);
 
+
+
+
+
+
+
+
+
+
+
+     // Si el pedido tiene direccion_envio_id pero el JOIN no devolvió datos, intentar obtener la dirección directamente
+     let direccionEnvioData = null;
+    
+     // Verificar si tenemos datos del JOIN (incluso si algunos campos son NULL)
+     const hasJoinData = orderData.direccion_id || 
+                        orderData.nombre_destinatario || 
+                        orderData.telefono || 
+                        orderData.direccion || 
+                        orderData.ciudad;
+     
+     if (hasJoinData) {
+       // La dirección se obtuvo del JOIN (aunque algunos campos puedan ser NULL)
+       direccionEnvioData = {
+         id: orderData.direccion_id || orderData.direccion_envio_id,
+         nombreDestinatario: orderData.nombre_destinatario || null,
+         telefono: orderData.telefono || null,
+         direccion: orderData.direccion || null,
+         ciudad: orderData.ciudad || null,
+         departamento: orderData.departamento || null,
+         codigoPostal: orderData.codigo_postal || null,
+         pais: orderData.pais || null,
+         instrucciones: orderData.instrucciones || null
+       };
+       console.log('✅ Dirección obtenida del JOIN:', direccionEnvioData);
+     } else if (orderData.direccion_envio_id) {
+       // El pedido tiene una dirección asociada pero el JOIN no la encontró, intentar obtenerla directamente
+       console.log('⚠️ Dirección no encontrada en JOIN, buscando directamente con ID:', orderData.direccion_envio_id);
+       try {
+         const direccionRows = await query(
+           'SELECT id, nombre_destinatario, telefono, direccion, ciudad, departamento, codigo_postal, pais, instrucciones FROM direcciones_envio WHERE id = ?',
+           [orderData.direccion_envio_id]
+         );
+         if (direccionRows && direccionRows.length > 0) {
+           const dir = direccionRows[0];
+           console.log('✅ Dirección encontrada directamente:', dir);
+           direccionEnvioData = {
+             id: dir.id,
+             nombreDestinatario: dir.nombre_destinatario || null,
+             telefono: dir.telefono || null,
+             direccion: dir.direccion || null,
+             ciudad: dir.ciudad || null,
+             departamento: dir.departamento || null,
+             codigoPostal: dir.codigo_postal || null,
+             pais: dir.pais || null,
+             instrucciones: dir.instrucciones || null
+           };
+         } else {
+           console.log('❌ Dirección no encontrada en la base de datos con ID:', orderData.direccion_envio_id);
+         }
+       } catch (error) {
+         console.error('❌ Error al obtener dirección de envío:', error);
+         // Si hay error, direccionEnvioData permanece null
+       }
+     } else {
+       console.log('ℹ️ Pedido sin dirección de envío asociada');
+     }
+
     const order = new Order({
       ...orderData,
       usuario: {
@@ -109,17 +177,7 @@ class Order {
         tipoIdentificacion: orderData.usuario_tipo_identificacion,
         numeroIdentificacion: orderData.usuario_numero_identificacion
       },
-      direccionEnvio: orderData.direccion_id ? {
-        id: orderData.direccion_id,
-        nombreDestinatario: orderData.nombre_destinatario,
-        telefono: orderData.telefono,
-        direccion: orderData.direccion,
-        ciudad: orderData.ciudad,
-        departamento: orderData.departamento,
-        codigoPostal: orderData.codigo_postal,
-        pais: orderData.pais,
-        instrucciones: orderData.instrucciones || null
-      } : null,
+      direccionEnvio: direccionEnvioData,
       items,
       entrega: orderData.entrega_id ? {
         id: orderData.entrega_id,
@@ -205,6 +263,9 @@ class Order {
    * TRANSFORMACIONES PARA API
    * ===================================================== */
   toPublicObjectSimple() {
+
+
+    
     const itemsCount = this.itemsCount ?? (this.items ? this.items.length : 0);
 
     return {
@@ -222,6 +283,28 @@ class Order {
   }
 
   toPublicObject() {
+
+       // Asegurar que direccionEnvio se devuelva correctamente, incluso si algunos campos son null
+       let direccionEnvio = null;
+       if (this.direccionEnvio && (this.direccionEnvio.id || this.direccionEnvio.direccion || this.direccionEnvio.nombreDestinatario)) {
+         // Si hay al menos un campo con datos, devolver el objeto completo
+         direccionEnvio = {
+           id: this.direccionEnvio.id || null,
+           nombreDestinatario: this.direccionEnvio.nombreDestinatario || null,
+           telefono: this.direccionEnvio.telefono || null,
+           direccion: this.direccionEnvio.direccion || null,
+           ciudad: this.direccionEnvio.ciudad || null,
+           departamento: this.direccionEnvio.departamento || null,
+           codigoPostal: this.direccionEnvio.codigoPostal || null,
+           pais: this.direccionEnvio.pais || null,
+           instrucciones: this.direccionEnvio.instrucciones || null
+         };
+         console.log('📦 toPublicObject - direccionEnvio construida:', direccionEnvio);
+       } else {
+         console.log('⚠️ toPublicObject - direccionEnvio es null o vacía:', this.direccionEnvio);
+       }
+
+
     return {
       id: this.id,
       numeroOrden: this.numeroOrden,
@@ -241,7 +324,7 @@ class Order {
       fechaEntregaEstimada: this.fechaEntregaEstimada,
       fechaEntregaReal: this.fechaEntregaReal,
       usuario: this.usuario || undefined,
-      direccionEnvio: this.direccionEnvio || undefined,
+      direccionEnvio: direccionEnvio,
       items: this.items || [],
       entrega: this.entrega || undefined
     };

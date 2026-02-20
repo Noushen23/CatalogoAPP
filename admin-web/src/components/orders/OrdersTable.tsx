@@ -6,14 +6,15 @@ import { AdminOrder, OrderFilters, OrderStatus, PaymentMethod } from '@/lib/admi
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { 
-  MagnifyingGlassIcon, 
-  FunnelIcon, 
-  ArrowUpIcon, 
+import {
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  ArrowUpIcon,
   ArrowDownIcon,
   EyeIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 
@@ -61,10 +62,10 @@ export default function OrdersTable() {
   const skeletonItems = Array.from({ length: 10 }, (_, idx) => ({
     id: `skeleton-${idx}`,
   }))
-  
 
 
-  
+
+
 
 
   const [filters, setFilters] = useState<OrderFilters>({
@@ -74,39 +75,9 @@ export default function OrdersTable() {
     orderDir: 'DESC',
   });
 
-  const { data, isLoading, error } = useAdminOrders(filters);
+  const { data, isLoading, error, refetch } = useAdminOrders(filters);
 
-  // Funciones de utilidad
-  // const copyToClipboard = async (text: string, label: string) => {
-  //   try {
-  //     await navigator.clipboard.writeText(text);
-  //     toast.success(`${label} copiado al portapapeles`);
-  //   } catch (error) {
-  //     toast.error('Error al copiar al portapapeles');
-  //   }
-  // };
 
-  // const shareOrder = async (order: AdminOrder) => {
-  //   try {
-  //     const message = `Pedido ${order.numeroOrden}\nCliente: ${order.usuario?.nombreCompleto || 'N/A'}\nTotal: $${order.total.toLocaleString('es-CO')}\nEstado: ${statusLabels[order.estado]}`;
-      
-  //     if (navigator.share) {
-  //       await navigator.share({
-  //         title: `Pedido ${order.numeroOrden}`,
-  //         text: message,
-  //       });
-  //     } else {
-  //       await copyToClipboard(message, 'Información del pedido');
-  //     }
-  //   } catch (error) {
-  //     console.log('Error sharing:', error);
-  //   }
-  // };
-
-  // const printOrders = () => {
-  //   window.print();
-  //   toast.success('Imprimiendo pedidos...');
-  // };
 
   const handleFilterChange = (key: keyof OrderFilters, value: OrderFilters[keyof OrderFilters]) => {
     setFilters((prev) => ({
@@ -155,8 +126,8 @@ export default function OrdersTable() {
   };
 
   const toggleOrderSelection = (orderId: string) => {
-    setSelectedOrders(prev => 
-      prev.includes(orderId) 
+    setSelectedOrders(prev =>
+      prev.includes(orderId)
         ? prev.filter(id => id !== orderId)
         : [...prev, orderId]
     );
@@ -186,8 +157,8 @@ export default function OrdersTable() {
   // Filtrar órdenes por término de búsqueda
   const filteredOrders = useMemo<AdminOrder[]>(() => {
     if (!searchTerm) return uniqueOrders;
-    
-    return uniqueOrders.filter(order => 
+
+    return uniqueOrders.filter(order =>
       order.numeroOrden.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.usuario?.nombreCompleto?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.usuario?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -224,7 +195,7 @@ export default function OrdersTable() {
               </span>
             )}
           </div>
-          
+
           <div className="flex items-center gap-3">
             {/* Búsqueda */}
             <div className="relative">
@@ -237,7 +208,7 @@ export default function OrdersTable() {
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
               />
             </div>
-            
+
             {/* Botón de filtros */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -246,7 +217,22 @@ export default function OrdersTable() {
               <FunnelIcon className="h-5 w-5" />
               {showFilters ? 'Ocultar Filtros' : 'Mostrar Filtros'}
             </button>
-            
+
+
+            {/* Botón de refrescar */}
+            <button
+              onClick={() => refetch()}
+              disabled={isLoading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              <ArrowPathIcon
+                className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
+              />
+              Actualizar
+            </button>
+
+
+
             {/* Acciones masivas */}
             {selectedOrders.length > 0 && (
               <div className="flex items-center gap-2">
@@ -397,7 +383,7 @@ export default function OrdersTable() {
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleSort('numero_orden')}
                     >
@@ -408,7 +394,7 @@ export default function OrdersTable() {
                         )}
                       </div>
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleSort('usuario_id')}
                     >
@@ -419,7 +405,7 @@ export default function OrdersTable() {
                         )}
                       </div>
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleSort('estado')}
                     >
@@ -439,7 +425,7 @@ export default function OrdersTable() {
                     {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Dirección de Envío
                     </th> */}
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleSort('total')}
                     >
@@ -450,7 +436,7 @@ export default function OrdersTable() {
                         )}
                       </div>
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleSort('fecha_creacion')}
                     >
@@ -498,9 +484,8 @@ export default function OrdersTable() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            statusColors[order.estado]
-                          }`}
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[order.estado]
+                            }`}
                         >
                           {statusLabels[order.estado]}
                         </span>

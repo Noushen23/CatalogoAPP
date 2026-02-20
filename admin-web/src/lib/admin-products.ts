@@ -190,6 +190,47 @@ export const AdminProductsService = {
     }
   },
 
+  /**
+   * Obtener analíticas de un producto
+   */
+  getProductAnalytics: async (id: string, months: number = 3) => {
+    try{
+      const response = await api.get(`/products/${id}/analytics`, { params: { months } })
+      if (response.data && response.data.success){
+      }
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      }
+    } catch (error) {
+      console.error('❌ AdminProductsService: Error fetching product analytics:', error)
+      throw error
+    }
+  },
+
+  getProductHistory: async (id: string, limit: number = 50, offset: number = 0) => {
+    try {
+      const response = await api.get(`/products/${id}/history`, {
+        params: { limit, offset }
+      })
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data
+        }
+      }
+      
+      throw new Error('Error al obtener historial del producto')
+    } catch (error) {
+      console.error('Error fetching product history:', error)
+      throw error
+    }
+  },
+
+
+
   // Obtener un producto por ID
   getProduct: async (id: string) => {
     try {

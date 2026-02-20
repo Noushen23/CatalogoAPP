@@ -12,20 +12,20 @@ class ProductController {
   // Obtener todos los productos
   static async getProducts(req, res) {
     try {
-      const { 
+      const {
         categoriaId, precioMin, precioMax, calificacionMin, enOferta, search, stockFilter,
         esServicio, // Nuevo filtro para servicios
         es_servicio, // Alias alternativo
         activo, // Filtro para productos activos/inactivos
         sortBy = 'recientes', // recientes, precio_asc, precio_desc, ventas, calificacion
-        page = 1, 
-        limit = 20 
+        page = 1,
+        limit = 20
       } = req.query;
-      
+
       // Construir query con filtros dinámicos
       let whereConditions = [];
       let queryParams = [];
-      
+
       // Filtro por productos activos (SIEMPRE con ?)
       if (activo !== undefined) {
         const activoValue = activo === 'true' || activo === '1' || activo === 1 || activo === true;
@@ -35,7 +35,7 @@ class ProductController {
         whereConditions.push('p.activo = ?');
         queryParams.push(1);
       }
-      
+
       // Filtro por categoría
       if (categoriaId) {
         whereConditions.push('p.categoria_id = ?');
@@ -71,7 +71,7 @@ class ProductController {
         const searchTerm = `%${search.trim()}%`;
         queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
       }
-      
+
       // Filtro por estado de stock
       if (stockFilter) {
         switch (stockFilter) {
@@ -92,7 +92,7 @@ class ProductController {
         // Normalizar el valor: puede venir como string 'true'/'false', número 1/0, o boolean
         const esServicioValue = esServicio !== undefined ? esServicio : es_servicio;
         const isService = esServicioValue === 'true' || esServicioValue === '1' || esServicioValue === 1 || esServicioValue === true;
-        
+
         if (isService) {
           // Filtrar solo servicios: es_servicio = 1 O (es_servicio IS NULL Y tiene etiqueta servicio)
           whereConditions.push('(p.es_servicio = 1 OR (p.es_servicio IS NULL AND p.etiquetas LIKE ?))');
@@ -103,9 +103,9 @@ class ProductController {
           queryParams.push('%"servicio"%');
         }
       }
-      
+
       const whereClause = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1';
-      
+
       // Validar y convertir parámetros de paginación a enteros
       const pageNum = parseInt(page) || 1;
       const limitNum = parseInt(limit) || 20;
@@ -113,7 +113,7 @@ class ProductController {
 
       // Determinar ordenamiento
       let orderBy = 'p.fecha_creacion DESC'; // Por defecto: más recientes
-      
+
       switch (sortBy) {
         case 'precio_asc':
           orderBy = 'p.precio ASC';
@@ -145,7 +145,7 @@ class ProductController {
           orderBy = 'p.fecha_creacion DESC';
           break;
       }
-      
+
       const productsQuery = `
         SELECT
           p.id, p.nombre, p.descripcion, p.precio, p.precio_oferta, p.en_oferta,
@@ -159,25 +159,25 @@ class ProductController {
         ORDER BY ${orderBy}
         LIMIT ? OFFSET ?
       `;
-      
+
       // Asegurar que los parámetros sean del tipo correcto (enteros)
       queryParams.push(Number(limitNum), Number(offset));
 
       const products = await query(productsQuery, queryParams);
-      
+
       if (!Array.isArray(products)) {
         throw new Error(`products no es un array: ${typeof products}`);
       }
 
       // Obtener imágenes para todos los productos de forma separada (más confiable)
       console.log('📦 [getProducts] Iniciando obtención de imágenes para', products.length, 'productos');
-      
+
       const formattedProducts = await Promise.all(products.map(async (product) => {
         // Obtener imágenes del producto de forma separada
         let imagenes = [];
         try {
           console.log(`🔍 [getProducts] Consultando imágenes para producto ${product.id}`);
-          
+
           const imagesQuery = `
             SELECT id, url_imagen, orden, es_principal
             FROM imagenes_producto
@@ -185,20 +185,20 @@ class ProductController {
             ORDER BY orden ASC
           `;
           const images = await query(imagesQuery, [product.id]);
-          
+
           console.log(`📊 [getProducts] Producto ${product.id}: ${images.length} imagen(es) encontrada(s) en BD`);
           if (images.length > 0) {
-            console.log(`📋 [getProducts] URLs en BD para producto ${product.id}:`, 
+            console.log(`📋 [getProducts] URLs en BD para producto ${product.id}:`,
               images.map(img => ({ id: img.id, url: img.url_imagen, orden: img.orden }))
             );
           }
-          
+
           // Usar ImageHelper para formatear todas las imágenes de forma centralizada
           imagenes = ImageHelper.formatProductImages(images);
-          
+
           console.log(`✅ [getProducts] Producto ${product.id}: ${imagenes.length} imagen(es) formateada(s)`);
           if (imagenes.length > 0) {
-            console.log(`📤 [getProducts] URLs finales para producto ${product.id}:`, 
+            console.log(`📤 [getProducts] URLs finales para producto ${product.id}:`,
               imagenes.map(img => ({ id: img.id, url: img.urlImagen, orden: img.orden }))
             );
           }
@@ -206,7 +206,7 @@ class ProductController {
           console.error(`❌ [getProducts] Error obteniendo imágenes para producto ${product.id}:`, error.message);
           imagenes = [];
         }
-        
+
         // Parsear etiquetas
         let etiquetas = [];
         if (product.etiquetas_raw) {
@@ -224,8 +224,8 @@ class ProductController {
           descripcion: product.descripcion,
           precio: parseFloat(product.precio),
           precioOferta: product.precio_oferta ? parseFloat(product.precio_oferta) : null,
-          precioFinal: product.precio_oferta && product.precio_oferta < product.precio 
-            ? parseFloat(product.precio_oferta) 
+          precioFinal: product.precio_oferta && product.precio_oferta < product.precio
+            ? parseFloat(product.precio_oferta)
             : parseFloat(product.precio),
           enOferta: Boolean(product.en_oferta),
           categoriaId: product.categoria_id,
@@ -307,10 +307,10 @@ class ProductController {
       }
 
       const product = products[0];
-      
+
       // Obtener imágenes del producto de forma separada (más confiable)
       console.log(`🖼️ [getProductById] Iniciando obtención de imágenes para producto ${id}`);
-      
+
       let imagenes = [];
       try {
         const imagesQuery = `
@@ -319,34 +319,34 @@ class ProductController {
           WHERE producto_id = ?
           ORDER BY orden ASC
         `;
-        
+
         console.log(`🔍 [getProductById] Ejecutando consulta SQL para producto ${id}`);
         const images = await query(imagesQuery, [id]);
-        
+
         console.log(`📊 [getProductById] Producto ${id}: ${images.length} imagen(es) encontrada(s) en BD`);
         if (images.length > 0) {
-          console.log(`📋 [getProductById] URLs en BD para producto ${id}:`, 
-            images.map(img => ({ 
-              id: img.id, 
-              url_imagen: img.url_imagen, 
-              orden: img.orden, 
-              es_principal: img.es_principal 
+          console.log(`📋 [getProductById] URLs en BD para producto ${id}:`,
+            images.map(img => ({
+              id: img.id,
+              url_imagen: img.url_imagen,
+              orden: img.orden,
+              es_principal: img.es_principal
             }))
           );
         }
-        
+
         // Usar ImageHelper para formatear todas las imágenes de forma centralizada
         console.log(`🔄 [getProductById] Formateando imágenes para producto ${id}`);
         imagenes = ImageHelper.formatProductImages(images);
-        
+
         console.log(`✅ [getProductById] Producto ${id}: ${imagenes.length} imagen(es) procesada(s) y enviada(s)`);
         if (imagenes.length > 0) {
-          console.log(`📤 [getProductById] URLs finales para producto ${id}:`, 
-            imagenes.map(img => ({ 
-              id: img.id, 
-              url: img.urlImagen, 
-              orden: img.orden, 
-              esPrincipal: img.esPrincipal 
+          console.log(`📤 [getProductById] URLs finales para producto ${id}:`,
+            imagenes.map(img => ({
+              id: img.id,
+              url: img.urlImagen,
+              orden: img.orden,
+              esPrincipal: img.esPrincipal
             }))
           );
         }
@@ -354,7 +354,7 @@ class ProductController {
         console.error(`❌ [getProductById] Error obteniendo imágenes para producto ${id}:`, error.message);
         imagenes = [];
       }
-      
+
       // Parsear etiquetas
       let etiquetas = [];
       if (product.etiquetas_raw) {
@@ -377,8 +377,8 @@ class ProductController {
         descripcion: product.descripcion,
         precio: parseFloat(product.precio),
         precioOferta: product.precio_oferta ? parseFloat(product.precio_oferta) : null,
-        precioFinal: product.precio_oferta && product.precio_oferta < product.precio 
-          ? parseFloat(product.precio_oferta) 
+        precioFinal: product.precio_oferta && product.precio_oferta < product.precio
+          ? parseFloat(product.precio_oferta)
           : parseFloat(product.precio),
         enOferta: Boolean(product.en_oferta),
         categoriaId: product.categoria_id,
@@ -418,7 +418,7 @@ class ProductController {
       // Log final para verificar
       console.log(`📦 Producto ${id} - Total imágenes en respuesta: ${formattedProduct.imagenes.length}`);
       console.log(`🖼️  Estructura de imágenes:`, JSON.stringify(formattedProduct.imagenes, null, 2));
-      
+
       res.json({
         success: true,
         message: 'Producto obtenido exitosamente',
@@ -440,7 +440,7 @@ class ProductController {
   static async invalidateProductCache(req, res) {
     try {
       const { productId } = req.params;
-      
+
       // Esta función puede ser extendida para invalidar cache específico
       // Por ahora solo confirmamos que el producto existe
       if (productId) {
@@ -452,7 +452,7 @@ class ProductController {
           });
         }
       }
-      
+
       res.status(200).json({
         success: true,
         message: 'Cache invalidado exitosamente',
@@ -470,12 +470,12 @@ class ProductController {
   // Verificar si un producto ya existe por SKU o CodVinculacion
   static async checkProductExists(req, res) {
     const { sku, CodVinculacion } = req.query;
-    
+
     try {
       let existingProduct = null;
       let searchField = '';
       let searchValue = '';
-      
+
       if (sku) {
         const products = await query('SELECT id, nombre, sku, CodVinculacion FROM productos WHERE sku = ?', [sku]);
         if (products.length > 0) {
@@ -491,7 +491,7 @@ class ProductController {
           searchValue = CodVinculacion;
         }
       }
-      
+
       res.status(200).json({
         success: true,
         exists: !!existingProduct,
@@ -539,7 +539,7 @@ class ProductController {
         // 1. Insertar en la tabla principal `productos`
         const slug = nombre.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').trim();
         const categoriaIdFinal = categoria_id || null;
-        
+
         const esServicioValue = Boolean(esServicio || es_servicio || false);
         await connection.execute(
           'INSERT INTO productos (id, nombre, slug, descripcion, precio, precio_oferta, categoria_id, stock, stock_minimo, sku, codigo_barras, activo, destacado, en_oferta, CodVinculacion, es_servicio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -549,30 +549,30 @@ class ProductController {
         // 2. Insertar en `producto_imagenes`
         if (imagenes && imagenes.length > 0) {
           console.log(`📸 [createProduct] Procesando ${imagenes.length} imagen(es) para producto ${productId}...`);
-          
+
           // Crear directorio específico para este producto
           const productUploadsDir = path.join(__dirname, '../../uploads/products', productId);
           console.log(`📁 [createProduct] Creando directorio para imágenes:`, productUploadsDir);
           await fs.mkdir(productUploadsDir, { recursive: true });
           console.log(`✅ [createProduct] Directorio creado exitosamente`);
-          
+
           for (let i = 0; i < imagenes.length; i++) {
             console.log(`🖼️ [createProduct] Procesando imagen ${i + 1}/${imagenes.length} para producto ${productId}`);
             const imageData = imagenes[i];
             let imageUrl = imageData;
-            
+
             // Si es base64, convertir a archivo
             if (typeof imageData === 'string' && imageData.startsWith('data:image/')) {
               const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
               const buffer = Buffer.from(base64Data, 'base64');
               const ext = imageData.split(';')[0].split('/')[1];
               const filename = `product_${Date.now()}_${i}_optimized.${ext}`.replace(/\s+/g, '_');
-              
+
               // Guardar buffer temporalmente para optimizar
               const tempPath = path.join(productUploadsDir, `temp_${filename}`);
               const finalPath = path.join(productUploadsDir, filename);
               await fs.writeFile(tempPath, buffer);
-              
+
               // Optimizar imagen con Sharp si está disponible
               try {
                 await imageProcessor.optimizeImage(tempPath, finalPath);
@@ -581,7 +581,7 @@ class ProductController {
                 // Si falla la optimización, renombrar el temporal
                 await fs.rename(tempPath, finalPath);
               }
-              
+
               imageUrl = `/uploads/products/${productId}/${filename}`;
               console.log(`✅ Imagen ${i + 1} guardada: ${imageUrl}`);
             } else if (typeof imageData === 'string' && (imageData.startsWith('/uploads/') || imageData.startsWith('http'))) {
@@ -609,15 +609,15 @@ class ProductController {
               orden: i,
               es_principal: i === 0
             });
-            
+
             await connection.execute(
               'INSERT INTO imagenes_producto (id, producto_id, url_imagen, orden, es_principal) VALUES (?, ?, ?, ?, ?)',
               [imageId, productId, imageUrl, i, i === 0]
             );
-            
+
             console.log(`✅ [createProduct] Imagen ${i + 1} guardada en BD exitosamente`);
           }
-          
+
           console.log(`✅ [createProduct] Todas las imágenes procesadas para producto ${productId}`);
         } else {
           console.log(`📭 [createProduct] No hay imágenes para procesar en producto ${productId}`);
@@ -626,7 +626,7 @@ class ProductController {
         // 3. Actualizar etiquetas como JSON en la tabla productos
         if (etiquetas && etiquetas.length > 0) {
           console.log(`🏷️ Procesando ${etiquetas.length} etiqueta(s) para producto...`);
-          
+
           const etiquetasJson = JSON.stringify(etiquetas);
           await connection.execute('UPDATE productos SET etiquetas = ? WHERE id = ?', [etiquetasJson, productId]);
           console.log(`✅ Etiquetas actualizadas: ${etiquetas.join(', ')}`);
@@ -668,7 +668,7 @@ class ProductController {
           console.log(`📋 [createProduct] Imágenes raw encontradas:`, product.imagenes_raw);
           const imagenesArray = JSON.parse(`[${product.imagenes_raw}]`);
           console.log(`📊 [createProduct] ${imagenesArray.length} imagen(es) parseada(s) desde GROUP_CONCAT`);
-          
+
           // Usar ImageHelper para formatear todas las imágenes de forma centralizada
           imagenesFormateadas = imagenesArray.map((img, idx) => {
             console.log(`🖼️ [createProduct] Formateando imagen ${idx + 1}/${imagenesArray.length}`);
@@ -681,7 +681,7 @@ class ProductController {
             };
             return ImageHelper.formatProductImage(imageObj);
           }).filter(img => img !== null); // Filtrar imágenes inválidas
-          
+
           console.log(`✅ [createProduct] ${imagenesFormateadas.length} imagen(es) formateada(s) exitosamente`);
         } catch (error) {
           console.error(`❌ [createProduct] Error parseando imágenes:`, error.message);
@@ -690,7 +690,7 @@ class ProductController {
       } else {
         console.log(`📭 [createProduct] No hay imágenes raw para formatear`);
       }
-      
+
       let etiquetasFormateadas = [];
       if (product.etiquetas_raw) {
         etiquetasFormateadas = product.etiquetas_raw.split(',');
@@ -703,8 +703,8 @@ class ProductController {
         descripcion: product.descripcion,
         precio: parseFloat(product.precio),
         precioOferta: product.precio_oferta ? parseFloat(product.precio_oferta) : null,
-        precioFinal: product.precio_oferta && product.precio_oferta < product.precio 
-          ? parseFloat(product.precio_oferta) 
+        precioFinal: product.precio_oferta && product.precio_oferta < product.precio
+          ? parseFloat(product.precio_oferta)
           : parseFloat(product.precio),
         enOferta: product.precio_oferta && product.precio_oferta < product.precio,
         categoriaId: product.categoria_id,
@@ -736,12 +736,12 @@ class ProductController {
 
     } catch (error) {
       console.error('Error al crear producto:', error);
-      
+
       // Manejar errores específicos de duplicación
       if (error.code === 'ER_DUP_ENTRY') {
         let duplicateField = 'campo';
         let duplicateValue = 'valor';
-        
+
         // Extraer información del error de duplicación
         if (error.sqlMessage.includes('sku')) {
           duplicateField = 'SKU';
@@ -753,7 +753,7 @@ class ProductController {
           duplicateField = 'código de vinculación';
           duplicateValue = CodVinculacion || 'N/A';
         }
-        
+
         return res.status(409).json({
           success: false,
           message: `Ya existe un producto con el mismo ${duplicateField}: ${duplicateValue}`,
@@ -762,7 +762,7 @@ class ProductController {
           duplicateValue
         });
       }
-      
+
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -816,10 +816,10 @@ class ProductController {
       await transaction(async (connection) => {
         // 1. Actualizar la tabla principal `productos`
         const slug = nombre ? nombre.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').trim() : null;
-        
+
         const updateFields = [];
         const updateValues = [];
-        
+
         if (nombre !== undefined) {
           updateFields.push('nombre = ?', 'slug = ?');
           updateValues.push(nombre, slug);
@@ -876,14 +876,14 @@ class ProductController {
           updateFields.push('CodVinculacion = ?');
           updateValues.push(CodVinculacion);
         }
-        
+
         // Calcular en_oferta
         if (precio_oferta !== undefined || precio !== undefined) {
           const enOferta = precio_oferta && precio !== undefined && precio_oferta < precio ? 1 : 0;
           updateFields.push('en_oferta = ?');
           updateValues.push(enOferta);
         }
-        
+
         updateFields.push('fecha_actualizacion = NOW()');
         updateValues.push(id);
 
@@ -901,22 +901,22 @@ class ProductController {
             total: imagenes?.length || 0,
             tipo: Array.isArray(imagenes) ? 'array' : typeof imagenes
           });
-          
+
           // Obtener imágenes existentes antes de eliminarlas (para borrar archivos físicos)
           console.log(`🔍 [updateProduct] Obteniendo imágenes existentes del producto ${id}...`);
           const existingImagesQuery = 'SELECT url_imagen FROM imagenes_producto WHERE producto_id = ?';
           const existingImages = await connection.query(existingImagesQuery, [id]);
-          
+
           console.log(`📋 [updateProduct] Imágenes existentes encontradas:`, {
             total: existingImages?.length || 0,
             urls: existingImages?.map(img => img.url_imagen) || []
           });
-          
+
           // Eliminar imágenes existentes de la base de datos
           console.log(`🗑️ [updateProduct] Eliminando imágenes existentes de la BD para producto ${id}...`);
           await connection.execute('DELETE FROM imagenes_producto WHERE producto_id = ?', [id]);
           console.log(`✅ [updateProduct] Imágenes eliminadas de la BD`);
-          
+
           // Eliminar archivos físicos de las imágenes antiguas
           if (existingImages && existingImages.length > 0) {
             console.log(`🗑️ [updateProduct] Eliminando ${existingImages.length} archivo(s) físico(s)...`);
@@ -935,22 +935,22 @@ class ProductController {
           } else {
             console.log(`📭 [updateProduct] No hay archivos físicos antiguos para eliminar`);
           }
-          
+
           // Insertar nuevas imágenes si las hay
           if (imagenes && imagenes.length > 0) {
             console.log(`📸 [updateProduct] Procesando ${imagenes.length} nueva(s) imagen(es)...`);
-            
+
             // Crear directorio específico para este producto
             const productUploadsDir = path.join(__dirname, '../../uploads/products', id);
             console.log(`📁 [updateProduct] Creando/verificando directorio:`, productUploadsDir);
             await fs.mkdir(productUploadsDir, { recursive: true });
             console.log(`✅ [updateProduct] Directorio listo`);
-            
+
             for (let i = 0; i < imagenes.length; i++) {
               console.log(`🖼️ [updateProduct] Procesando imagen ${i + 1}/${imagenes.length}...`);
               const imageData = imagenes[i];
               let imageUrl = imageData;
-              
+
               // Si es base64, convertir a archivo
               if (typeof imageData === 'string' && imageData.startsWith('data:image/')) {
                 const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -958,11 +958,11 @@ class ProductController {
                 const ext = imageData.split(';')[0].split('/')[1];
                 const filename = `product_${Date.now()}_${i}_optimized.${ext}`.replace(/\s+/g, '_');
                 const filePath = path.join(productUploadsDir, filename);
-                
+
                 // Guardar buffer temporalmente para optimizar
                 const tempPath = path.join(productUploadsDir, `temp_${filename}`);
                 await fs.writeFile(tempPath, buffer);
-                
+
                 // Optimizar imagen con Sharp si está disponible
                 try {
                   await imageProcessor.optimizeImage(tempPath, filePath);
@@ -971,7 +971,7 @@ class ProductController {
                   // Si falla la optimización, renombrar el temporal
                   await fs.rename(tempPath, filePath);
                 }
-                
+
                 imageUrl = `/uploads/products/${id}/${filename}`;
                 console.log(`✅ Imagen ${i + 1} guardada: ${imageUrl}`);
               } else if (typeof imageData === 'string' && (imageData.startsWith('/uploads/') || imageData.startsWith('http'))) {
@@ -1003,12 +1003,12 @@ class ProductController {
                 orden: i,
                 es_principal: i === 0
               });
-              
+
               await connection.execute(
                 'INSERT INTO imagenes_producto (id, producto_id, url_imagen, orden, es_principal) VALUES (?, ?, ?, ?, ?)',
                 [imageId, id, imageUrl, i, i === 0]
               );
-              
+
               console.log(`✅ [updateProduct] Imagen ${i + 1} guardada en BD exitosamente`);
             }
             console.log(`✅ [updateProduct] ${imagenes.length} imagen(es) sincronizada(s) exitosamente`);
@@ -1022,7 +1022,7 @@ class ProductController {
         // 3. Sincronizar etiquetas: Actualizar como JSON
         if (etiquetas !== undefined) {
           console.log(`🔄 Sincronizando etiquetas para producto ${id}...`);
-          
+
           const etiquetasJson = etiquetas && etiquetas.length > 0 ? JSON.stringify(etiquetas) : null;
           await connection.execute('UPDATE productos SET etiquetas = ? WHERE id = ?', [etiquetasJson, id]);
           console.log(`✅ Etiquetas sincronizadas: ${etiquetas ? etiquetas.join(', ') : 'ninguna'}`);
@@ -1062,7 +1062,7 @@ class ProductController {
           console.log(`📋 [updateProduct] Imágenes raw encontradas:`, product.imagenes_raw);
           const imagenesArray = JSON.parse(`[${product.imagenes_raw}]`);
           console.log(`📊 [updateProduct] ${imagenesArray.length} imagen(es) parseada(s) desde GROUP_CONCAT`);
-          
+
           // Usar ImageHelper para formatear todas las imágenes de forma centralizada
           imagenesUpdate = imagenesArray.map((img, idx) => {
             console.log(`🖼️ [updateProduct] Formateando imagen ${idx + 1}/${imagenesArray.length}`);
@@ -1075,7 +1075,7 @@ class ProductController {
             };
             return ImageHelper.formatProductImage(imageObj);
           }).filter(img => img !== null); // Filtrar imágenes inválidas
-          
+
           console.log(`✅ [updateProduct] ${imagenesUpdate.length} imagen(es) formateada(s) exitosamente`);
         } catch (error) {
           console.error(`❌ [updateProduct] Error parseando imágenes:`, error.message);
@@ -1084,7 +1084,7 @@ class ProductController {
       } else {
         console.log(`📭 [updateProduct] No hay imágenes raw para formatear`);
       }
-      
+
       let etiquetasUpdate = [];
       if (product.etiquetas_raw) {
         try {
@@ -1102,8 +1102,8 @@ class ProductController {
         descripcion: product.descripcion,
         precio: parseFloat(product.precio),
         precioOferta: product.precio_oferta ? parseFloat(product.precio_oferta) : null,
-        precioFinal: product.precio_oferta && product.precio_oferta < product.precio 
-          ? parseFloat(product.precio_oferta) 
+        precioFinal: product.precio_oferta && product.precio_oferta < product.precio
+          ? parseFloat(product.precio_oferta)
           : parseFloat(product.precio),
         enOferta: product.precio_oferta && product.precio_oferta < product.precio,
         categoriaId: product.categoria_id,
@@ -1246,7 +1246,7 @@ class ProductController {
   static async getTopProducts(req, res) {
     try {
       const { limit = 10 } = req.query;
-      
+
       // Por ahora devolvemos productos destacados, pero se puede mejorar con lógica de ventas
       const products = await Product.find({
         destacado: true,
@@ -1328,13 +1328,13 @@ class ProductController {
       }
 
       const offset = (page - 1) * limit;
-      
+
       // Determinar el valor de activo (por defecto true si no se especifica)
       let activoValue = true;
       if (activo !== undefined) {
         activoValue = activo === 'true' || activo === '1' || activo === 1 || activo === true;
       }
-      
+
       const filters = {
         busqueda,
         categoriaId,
@@ -1395,10 +1395,10 @@ class ProductController {
       console.log(`📸 [uploadProductImages] Iniciando subida de imágenes para producto ${id}`);
       console.log(`📊 [uploadProductImages] Archivos recibidos:`, {
         total: files?.length || 0,
-        archivos: files?.map(f => ({ 
-          originalname: f.originalname, 
-          mimetype: f.mimetype, 
-          size: f.size 
+        archivos: files?.map(f => ({
+          originalname: f.originalname,
+          mimetype: f.mimetype,
+          size: f.size
         }))
       });
 
@@ -1422,7 +1422,7 @@ class ProductController {
       // Validar que todos los archivos son imágenes
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       const invalidFiles = files.filter(file => !allowedTypes.includes(file.mimetype));
-      
+
       if (invalidFiles.length > 0) {
         return res.status(400).json({
           success: false,
@@ -1433,7 +1433,7 @@ class ProductController {
       // Obtener el orden actual de las imágenes del producto
       const existingImages = await product.getImages();
       const nextOrder = existingImages.length > 0 ? Math.max(...existingImages.map(img => img.orden || 0)) + 1 : 1;
-      
+
       console.log(`📋 [uploadProductImages] Estado actual de imágenes:`, {
         productoId: id,
         imagenesExistentes: existingImages.length,
@@ -1469,7 +1469,7 @@ class ProductController {
           const baseName = `product_${Date.now()}_${i}`;
           const optimizedFileName = `${baseName}_optimized${ext}`;
           const optimizedPath = path.join(path.dirname(file.path), optimizedFileName);
-          
+
           console.log(`📝 [uploadProductImages] Generando nombre de archivo:`, {
             original: file.originalname,
             optimizado: optimizedFileName,
@@ -1479,12 +1479,12 @@ class ProductController {
           // Optimizar imagen con Sharp
           console.log(`⚙️ [uploadProductImages] Optimizando imagen ${i + 1}...`);
           const optimizationResult = await imageProcessor.optimizeImage(file.path, optimizedPath);
-          
+
           if (!optimizationResult.success) {
             console.error(`❌ [uploadProductImages] Error optimizando imagen ${i + 1}:`, optimizationResult.error);
             throw new Error(`Error optimizando imagen: ${optimizationResult.error}`);
           }
-          
+
           console.log(`✅ [uploadProductImages] Imagen ${i + 1} optimizada:`, {
             dimensiones: `${optimizationResult.metadata.width}x${optimizationResult.metadata.height}`,
             tamaño: `${Math.round(optimizationResult.metadata.size / 1024)}KB`
@@ -1492,7 +1492,7 @@ class ProductController {
 
           // Crear ruta relativa para la imagen optimizada (guardar en BD)
           const imagePath = `/uploads/products/${id}/${optimizedFileName}`;
-          
+
           console.log(`💾 [uploadProductImages] Guardando imagen ${i + 1} en BD:`, {
             rutaRelativa: imagePath,
             orden: order,
@@ -1520,7 +1520,7 @@ class ProductController {
           // Construir URL completa para el frontend
           const fullUrl = ImageHelper.buildImageUrl(imagePath);
           console.log(`🔗 [uploadProductImages] URL completa generada para imagen ${i + 1}:`, fullUrl);
-          
+
           return fullUrl;
 
         } catch (error) {
@@ -1578,17 +1578,17 @@ class ProductController {
       // Obtener las imágenes del producto
       console.log(`🔍 [deleteProductImage] Obteniendo imágenes del producto ${id}...`);
       const images = await product.getImages();
-      
+
       console.log(`📊 [deleteProductImage] Imágenes encontradas:`, {
         total: images.length,
-        imagenes: images.map((img, idx) => ({ 
-          indice: idx, 
-          id: img.id, 
-          url: img.url_imagen, 
-          orden: img.orden 
+        imagenes: images.map((img, idx) => ({
+          indice: idx,
+          id: img.id,
+          url: img.url_imagen,
+          orden: img.orden
         }))
       });
-      
+
       // Validar el índice
       if (imageIndex < 0 || imageIndex >= images.length) {
         console.error(`❌ [deleteProductImage] Índice inválido:`, {
@@ -1603,14 +1603,14 @@ class ProductController {
       }
 
       const imageToDelete = images[imageIndex];
-      
+
       console.log(`🎯 [deleteProductImage] Imagen a eliminar:`, {
         id: imageToDelete.id,
         url_imagen: imageToDelete.url_imagen,
         orden: imageToDelete.orden,
         es_principal: imageToDelete.es_principal
       });
-      
+
       // Eliminar el archivo físico del servidor
       if (imageToDelete.url_imagen && imageToDelete.url_imagen.startsWith('/uploads/')) {
         try {
@@ -1631,7 +1631,7 @@ class ProductController {
           razon: !imageToDelete.url_imagen ? 'URL vacía' : 'No es ruta local'
         });
       }
-      
+
       // Eliminar la imagen de la base de datos
       console.log(`💾 [deleteProductImage] Eliminando imagen de la BD:`, imageToDelete.id);
       await product.removeImage(imageToDelete.id);
@@ -1688,6 +1688,266 @@ class ProductController {
       });
     }
   }
+
+
+  /**
+     * Obtener analíticas de un producto
+     * Devuelve datos de ventas, ingresos, stock y precio por mes
+     */
+
+
+
+  static async getProductAnalytics(req, res) {
+    try {
+      const { id } = req.params;
+      const { months = 3 } = req.query; // Por defecto últimos 3 meses
+
+      // Validar que el producto existe
+      const productCheck = await query(
+        'SELECT id, nombre, precio, stock FROM productos WHERE id = ?',
+        [id]
+      );
+
+      if (productCheck.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      const product = productCheck[0];
+      const currentStock = product.stock || 0;
+      const currentPrice = parseFloat(product.precio) || 0;
+
+      // Obtener ventas por mes del producto
+      // Agrupar por mes y año desde items_orden
+      const salesQuery = `
+      SELECT 
+        DATE_FORMAT(o.fecha_creacion, '%Y-%m') as mes,
+        DATE_FORMAT(o.fecha_creacion, '%b') as mes_corto,
+        YEAR(o.fecha_creacion) as año,
+        MONTH(o.fecha_creacion) as mes_numero,
+        SUM(io.cantidad) as ventas,
+        SUM(io.cantidad * io.precio_unitario) as ingresos,
+        AVG(io.precio_unitario) as precio_promedio
+      FROM items_orden io
+      INNER JOIN ordenes o ON io.orden_id = o.id
+      WHERE io.producto_id = ?
+        AND o.estado NOT IN ('cancelada', 'cancelado', 'reembolsada')
+        AND o.fecha_creacion >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+      GROUP BY DATE_FORMAT(o.fecha_creacion, '%Y-%m'), 
+               DATE_FORMAT(o.fecha_creacion, '%b'),
+               YEAR(o.fecha_creacion),
+               MONTH(o.fecha_creacion)
+      ORDER BY año ASC, mes_numero ASC
+    `;
+
+      const salesData = await query(salesQuery, [id, parseInt(months)]);
+
+      // Generar datos mensuales completos (rellenar meses sin ventas)
+      const monthlyData = [];
+      const currentDate = new Date();
+      const monthsToShow = parseInt(months);
+
+      // Mapa de meses en español
+      const mesesEsp = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+      // Crear un mapa de los datos de ventas por mes
+      const salesMap = {};
+      salesData.forEach(item => {
+        const key = `${item.año}-${String(item.mes_numero).padStart(2, '0')}`;
+        salesMap[key] = {
+          ventas: parseInt(item.ventas) || 0,
+          ingresos: parseFloat(item.ingresos) || 0,
+          precio: parseFloat(item.precio_promedio) || currentPrice
+        };
+      });
+
+      // Generar datos para cada mes
+      for (let i = monthsToShow - 1; i >= 0; i--) {
+        const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const key = `${year}-${String(month).padStart(2, '0')}`;
+        const mesNombre = mesesEsp[date.getMonth()];
+
+        const salesInfo = salesMap[key] || {
+          ventas: 0,
+          ingresos: 0,
+          precio: currentPrice
+        };
+
+        monthlyData.push({
+          mes: mesNombre,
+          mes_completo: `${mesNombre} ${year}`,
+          año: year,
+          mes_numero: month,
+          ventas: salesInfo.ventas,
+          stock: currentStock, // Stock actual (en producción se podría tener histórico)
+          precio: salesInfo.precio,
+          ingresos: salesInfo.ingresos,
+          unidadesVendidas: salesInfo.ventas
+        });
+      }
+
+      // Calcular estadísticas totales
+      const totalVentas = monthlyData.reduce((sum, item) => sum + item.ventas, 0);
+      const totalIngresos = monthlyData.reduce((sum, item) => sum + item.ingresos, 0);
+      const promedioVentas = totalVentas / monthlyData.length || 0;
+      const mesesConVentas = monthlyData.filter(item => item.ventas > 0).length;
+
+      res.json({
+        success: true,
+        message: 'Analíticas del producto obtenidas exitosamente',
+        data: {
+          producto: {
+            id: product.id,
+            nombre: product.nombre,
+            precioActual: currentPrice,
+            stockActual: currentStock
+          },
+          estadisticas: {
+            totalVentas,
+            totalIngresos,
+            promedioVentas: Math.round(promedioVentas * 100) / 100,
+            stockActual: currentStock,
+            mesesConVentas,
+            mesesAnalizados: monthlyData.length
+          },
+          datosMensuales: monthlyData
+        }
+      });
+
+    } catch (error) {
+      console.error('Error al obtener analíticas del producto:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor al obtener analíticas',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Obtener historial de cambios de un producto
+   * Devuelve todos los eventos relacionados con el producto (creación, actualizaciones, ventas, etc.)
+   */
+  static async getProductHistory(req, res) {
+    try {
+      const { id } = req.params;
+      const { limit = 50, offset = 0 } = req.query;
+
+      // Validar que el producto existe
+      const productCheck = await query(
+        'SELECT id, nombre FROM productos WHERE id = ?',
+        [id]
+      );
+
+      if (productCheck.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      // Obtener historial del producto
+      const historyQuery = `
+      SELECT 
+        hp.id,
+        hp.tipo_evento,
+        hp.campo_modificado,
+        hp.valor_anterior,
+        hp.valor_nuevo,
+        hp.descripcion,
+        hp.cantidad,
+        hp.orden_id,
+        hp.fecha_evento,
+        hp.datos_adicionales,
+        u.email as usuario_email,
+        u.nombre_completo as usuario_nombre,
+        o.numero_orden
+      FROM historial_productos hp
+      LEFT JOIN usuarios u ON hp.usuario_id = u.id
+      LEFT JOIN ordenes o ON hp.orden_id = o.id
+      WHERE hp.producto_id = ?
+      ORDER BY hp.fecha_evento DESC
+      LIMIT ? OFFSET ?
+    `;
+
+      const historyData = await query(historyQuery, [id, parseInt(limit), parseInt(offset)]);
+
+      // Obtener total de registros
+      const countQuery = `
+      SELECT COUNT(*) as total
+      FROM historial_productos
+      WHERE producto_id = ?
+    `;
+      const countResult = await query(countQuery, [id]);
+      const total = countResult[0]?.total || 0;
+
+      // Formatear datos del historial
+      const formattedHistory = historyData.map(item => {
+        let datosAdicionales = null;
+        if (item.datos_adicionales) {
+          try {
+            datosAdicionales = typeof item.datos_adicionales === 'string'
+              ? JSON.parse(item.datos_adicionales)
+              : item.datos_adicionales;
+          } catch (e) {
+            console.error('Error parseando datos_adicionales:', e);
+          }
+        }
+
+        return {
+          id: item.id,
+          tipoEvento: item.tipo_evento,
+          campoModificado: item.campo_modificado,
+          valorAnterior: item.valor_anterior,
+          valorNuevo: item.valor_nuevo,
+          descripcion: item.descripcion,
+          cantidad: item.cantidad,
+          ordenId: item.orden_id,
+          numeroOrden: item.numero_orden,
+          fechaEvento: item.fecha_evento,
+          datosAdicionales: datosAdicionales,
+          usuario: item.usuario_email ? {
+            email: item.usuario_email,
+            nombreCompleto: item.usuario_nombre
+          } : null
+        };
+      });
+
+      res.json({
+        success: true,
+        message: 'Historial del producto obtenido exitosamente',
+        data: {
+          producto: {
+            id: productCheck[0].id,
+            nombre: productCheck[0].nombre
+          },
+          historial: formattedHistory,
+          pagination: {
+            total,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            hasMore: (parseInt(offset) + parseInt(limit)) < total
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Error al obtener historial del producto:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor al obtener historial',
+        error: error.message
+      });
+    }                                                                                                                                                                                                                                                                                                                      
+  }
 }
+
+
+
+
 
 module.exports = ProductController;

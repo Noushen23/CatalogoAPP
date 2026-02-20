@@ -99,7 +99,7 @@ export async function generateOrderPDF(orderData: OrderData): Promise<void> {
   // ========== ENCABEZADO ==========
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('E-COMMERCE', centerX, currentY, { align: 'center' });
+  doc.text('BOMBEROS CUCUTA', centerX, currentY, { align: 'center' });
   currentY += 5;
   
   doc.setFontSize(7);

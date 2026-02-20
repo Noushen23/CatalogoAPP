@@ -118,6 +118,14 @@ router.get('/:id/reviews/stats', validateProductId, ReviewController.getProductR
 router.get('/:id/reviews/can-review', authenticateToken, validateProductId, ReviewController.canUserReviewProduct);
 router.post('/:id/reviews', authenticateToken, validateProductId, validateReview, ReviewController.createReview);
 
+
+
+// Ruta para obtener analíticas del producto
+router.get('/:id/analytics', validateProductId, ProductController.getProductAnalytics);
+
+// Ruta para obtener historial del producto
+router.get('/:id/history', validateProductId, ProductController.getProductHistory);
+
 // ÚLTIMA: Ruta para obtener producto por ID (debe ir al final)
 router.get('/:id', validateProductId, ProductController.getProductById);
 

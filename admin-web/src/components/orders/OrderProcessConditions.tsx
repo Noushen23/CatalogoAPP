@@ -10,7 +10,6 @@ import {
   TruckIcon,
   UserIcon,
   DocumentTextIcon,
-  CubeIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon as CheckCircleIconSolid } from "@heroicons/react/24/solid";
 
@@ -42,22 +41,18 @@ export default function OrderProcessConditions({
   const condiciones = {
     terceroEnTNS: !!order.tercero_id,
     pedidoEnTNS: !!order.tns_kardex_id,
-    repartidorAsignado: !!order.entrega?.id && !!order.entrega?.repartidor_id,
-    montadoAlCarro: order.montado_carro === 1 || order.montado_carro === true,
   };
 
   const todasCumplidas =
     condiciones.terceroEnTNS &&
-    condiciones.pedidoEnTNS &&
-    condiciones.repartidorAsignado &&
-    condiciones.montadoAlCarro;
+    condiciones.pedidoEnTNS;
 
   const puedeEstarEnProceso =
     order.estado === "confirmada" || order.estado === "en_proceso";
 
-  const handleMarcarMontadoAlCarro = async () => {
+  const handleEnviarAlRepartidor = async () => {
     if (!puedeEstarEnProceso) {
-      toast.error("Solo los pedidos confirmados pueden marcarse como montados al carro");
+      toast.error("Solo los pedidos confirmados pueden enviarse al repartidor");
       return;
     }
 
@@ -66,9 +61,9 @@ export default function OrderProcessConditions({
       const resultado = await DeliveryService.marcarPedidoMontadoAlCarro(order.id);
 
       if (resultado.estadoActualizado) {
-        toast.success("✅ Pedido marcado como montado al carro y estado actualizado a 'En Proceso'");
+        toast.success("✅ Pedido enviado al repartidor y estado actualizado a 'En Proceso'");
       } else {
-        toast.success("✅ Pedido marcado como montado al carro");
+        toast.success("✅ Pedido enviado al repartidor");
           if (resultado.razon) {
             toast.error(`ℹ️ ${resultado.razon}`, { duration: 5000 });
           }
@@ -82,8 +77,8 @@ export default function OrderProcessConditions({
         onUpdate();
       }
     } catch (error) {
-      console.error("Error al marcar pedido como montado al carro:", error);
-      const message = error instanceof Error ? error.message : "Error al marcar pedido como montado al carro";
+      console.error("Error al enviar pedido al repartidor:", error);
+      const message = error instanceof Error ? error.message : "Error al enviar pedido al repartidor";
       toast.error(message);
     } finally {
       setIsMarkingAsLoaded(false);
@@ -195,69 +190,13 @@ export default function OrderProcessConditions({
             </p>
           </div>
         </div>
-
-        {/* Condición 3: Repartidor asignado */}
-        <div
-          className={`flex items-center gap-3 p-3 rounded-lg border ${
-            condiciones.repartidorAsignado
-              ? "bg-green-50 border-green-200"
-              : "bg-gray-50 border-gray-200"
-          }`}
-        >
-          {condiciones.repartidorAsignado ? (
-            <CheckCircleIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
-          ) : (
-            <XCircleIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-          )}
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <TruckIcon className="w-4 h-4 text-gray-500" />
-              <span className="font-medium text-sm text-gray-900">
-                3. Repartidor asignado
-              </span>
-            </div>
-            <p className="text-xs text-gray-600 mt-1">
-              {condiciones.repartidorAsignado
-                ? "Un repartidor ha sido asignado al pedido"
-                : "Debe asignarse un repartidor al pedido"}
-            </p>
-          </div>
-        </div>
-
-        {/* Condición 4: Montado al carro */}
-        <div
-          className={`flex items-center gap-3 p-3 rounded-lg border ${
-            condiciones.montadoAlCarro
-              ? "bg-green-50 border-green-200"
-              : "bg-gray-50 border-gray-200"
-          }`}
-        >
-          {condiciones.montadoAlCarro ? (
-            <CheckCircleIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
-          ) : (
-            <XCircleIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-          )}
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <CubeIcon className="w-4 h-4 text-gray-500" />
-              <span className="font-medium text-sm text-gray-900">
-                4. Montado al carro
-              </span>
-            </div>
-            <p className="text-xs text-gray-600 mt-1">
-              {condiciones.montadoAlCarro
-                ? "El pedido está montado en el vehículo"
-                : "El pedido debe estar montado en el vehículo de entrega"}
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Acciones */}
       <div className="flex gap-3 pt-4 border-t border-gray-200">
-        {!condiciones.montadoAlCarro && (
+        {!order.montado_carro && (
           <button
-            onClick={handleMarcarMontadoAlCarro}
+            onClick={handleEnviarAlRepartidor}
             disabled={isMarkingAsLoaded}
             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -283,12 +222,12 @@ export default function OrderProcessConditions({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Marcando...
+                Enviando...
               </>
             ) : (
               <>
-                <CubeIcon className="w-4 h-4" />
-                Marcar como Montado al Carro
+                <TruckIcon className="w-4 h-4" />
+                Enviar al Repartidor
               </>
             )}
           </button>
@@ -335,7 +274,7 @@ export default function OrderProcessConditions({
       {todasCumplidas && order.estado === "confirmada" && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
-            ✅ Todas las condiciones están cumplidas. El pedido puede cambiar a &quot;En Proceso&quot;.
+            ✅ Todas las condiciones están cumplidas (Tercero en TNS y Pedido en TNS). El pedido puede cambiar a &quot;En Proceso&quot;.
             Haz clic en &quot;Verificar Estado&quot; para actualizarlo automáticamente.
           </p>
         </div>

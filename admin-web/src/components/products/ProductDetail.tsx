@@ -2,33 +2,33 @@
 
 import { useState } from 'react'
 import { AdminProduct } from '@/lib/admin-products'
-import { 
-  ArrowLeftIcon, 
-  PencilIcon, 
+import {
+  ArrowLeftIcon,
+  PencilIcon,
   EyeIcon,
   ChartBarIcon,
   ClockIcon,
   TagIcon,
-  CubeIcon,
   PhotoIcon,
-  StarIcon,
   CalendarIcon,
-  ShoppingCartIcon,
-  HeartIcon,
-  ShareIcon,
-  PrinterIcon
+  ArrowPathIcon
+
 } from '@heroicons/react/24/outline'
 import { ImageManager } from './ImageManager'
 import { format } from 'date-fns'
+import { ProductAnalytics } from './ProductAnalytics'
+import { ProductHistory } from './ProductHistory'
 import { es } from 'date-fns/locale'
 
 interface ProductDetailProps {
   product: AdminProduct
   onEdit?: () => void
   onBack?: () => void
+  onRefresh?: () => void
+  isLoading?: boolean
 }
 
-export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
+export function ProductDetail({ product, onEdit, onBack, onRefresh, isLoading = false }: ProductDetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'images' | 'analytics' | 'history'>('overview')
   const [showFullDescription, setShowFullDescription] = useState(false)
 
@@ -74,11 +74,10 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{product.title}</h1>
                 <div className="flex items-center space-x-4 mt-1">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    product.isActive 
-                      ? 'bg-green-100 text-green-800' 
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.isActive
+                      ? 'bg-green-100 text-green-800'
                       : 'bg-red-100 text-red-800'
-                  }`}>
+                    }`}>
                     {product.isActive ? 'Activo' : 'Inactivo'}
                   </span>
                   <span className="text-sm text-gray-500">ID: {product.id}</span>
@@ -90,14 +89,29 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <button className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+              {/* <button className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                 <ShareIcon className="h-4 w-4 mr-2" />
                 Compartir
               </button>
               <button className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                 <PrinterIcon className="h-4 w-4 mr-2" />
                 Imprimir
-              </button>
+              </button> */}
+
+              {onRefresh && (
+                <button
+                  onClick={onRefresh}
+                  disabled={isLoading}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  <ArrowPathIcon
+                    className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
+                  />
+                  Actualizar
+                </button>
+              )}
+
+
               {onEdit && (
                 <button
                   onClick={onEdit}
@@ -120,11 +134,10 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    activeTab === tab.id
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Icon className="h-5 w-5 inline mr-2" />
                   {tab.name}
@@ -235,41 +248,6 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
                   </div>
                 </div>
 
-                {/* Quick Stats */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Estadísticas Rápidas</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <CubeIcon className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-700">Stock</span>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">{product.stock || 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <ShoppingCartIcon className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-700">Ventas</span>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">0</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <HeartIcon className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-700">Favoritos</span>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">0</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <StarIcon className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-700">Calificación</span>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">Sin calificaciones</span>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Meta Info */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Información del Sistema</h3>
@@ -311,25 +289,13 @@ export function ProductDetail({ product, onEdit, onBack }: ProductDetailProps) {
 
         {activeTab === 'analytics' && (
           <div className="px-6 py-6">
-            <div className="text-center py-12">
-              <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Analíticas</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Las analíticas del producto estarán disponibles próximamente.
-              </p>
-            </div>
+            <ProductAnalytics product={product} />
           </div>
         )}
 
         {activeTab === 'history' && (
           <div className="px-6 py-6">
-            <div className="text-center py-12">
-              <ClockIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Historial</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                El historial de cambios estará disponible próximamente.
-              </p>
-            </div>
+            <ProductHistory product={product} />
           </div>
         )}
       </div>

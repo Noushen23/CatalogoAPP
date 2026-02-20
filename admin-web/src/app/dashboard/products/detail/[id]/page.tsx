@@ -10,7 +10,7 @@ export default function ProductDetailPage() {
   const router = useRouter()
   const productId = params.id as string
 
-  const { data: product, isLoading, error } = useQuery({
+  const { data: product, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-product', productId],
     queryFn: async (): Promise<AdminProduct> => {
       try {
@@ -171,6 +171,8 @@ export default function ProductDetailPage() {
         product={product}
         onEdit={handleEdit}
         onBack={handleBack}
+        onRefresh={refetch}
+        isLoading={isLoading}
       />
     </div>
   )

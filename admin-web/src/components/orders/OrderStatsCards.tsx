@@ -115,12 +115,12 @@ export default function OrderStatsCards() {
       {cards.map((card) => (
         <div
           key={card.title}
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow min-w-0"
         >
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">{card.title}</p>
-              <p className={`text-2xl font-bold mt-2 ${card.textColor}`}>
+              <p className={`text-xl sm:text-2xl font-bold mt-2 ${card.textColor} truncate`}> 
                 {card.value}
               </p>
             </div>
